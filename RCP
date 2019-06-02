@@ -1,0 +1,56 @@
+#!/bin/ksh93
+
+function DebugMessage
+{
+	if [[ -f ${DEBUG} ]]
+        then
+                print $@ >>${RCPOUT}
+        fi
+
+}
+function WriteStat
+{
+		DebugMessage "${1} has been changed to ${2}"
+		print ${2} > ${1}
+}
+
+FILENAME=${1##*/}
+
+RCPOUT=${TEMPRCPDEBUG}/${FILENAME}.log
+
+if [[ -f ${DEBUG} ]]
+then
+	>${RCPOUT}
+fi
+
+STAT=${TEMPRCP}/${FILENAME}
+
+if [[ ! -f ${STAT} ]]
+then
+	DebugMessage "Warning:${STAT} was not found!"
+	return 1
+fi
+
+trap "print FAIL > ${STAT};kill 0;exit 1"  1 2 3 15
+
+WriteStat ${STAT} "IP"
+
+DebugMessage "Running rcp ${@:-}"
+#rcp  "${@:-}"
+#scp  "${@:-}"
+
+if [[ -z ${RemoteCopyCommand} ]]
+then
+	RemoteCopyCommand=rcp
+fi
+
+${RemoteCopyCommand} "${@:-}"
+RET=$?
+DebugMessage "Return value is $RET"
+
+if [[ $RET == 0 ]]
+then
+	WriteStat ${STAT} "CO"
+else
+	WriteStat ${STAT} "FAIL"
+fi
