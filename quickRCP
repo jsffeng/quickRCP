@@ -9,8 +9,8 @@
 #               An example for such needs may be  #
 #               that the binary software load need# 
 #               to be shipped from one country to #
-#               another periodically within a     #
-#               global development team.          #
+#               another periodically for a global #
+#               development team.                 #
 #						  #
 #						  #
 ###################################################
@@ -35,14 +35,23 @@ function ResourceRelease
 {
 	if [[ ! -f ${DEBUG} ]]
 	then
-		# Release resource
-		${RSH} ${REMOTE_SERVER} -l ${USER_ID} rm -rf ${DESTDIR}/.ship* 2>/dev/null
+		# Release resource, in case ssh requiring password use RSH_FLAGS here
+		${RSH} ${RSH_FLAGS} ${REMOTE_SERVER} -l ${USER_ID} rm -rf ${DESTDIR}/.ship* 2>/dev/null
 		cd ${TEMP_WORKDIR}
 		rm -rf $TEMP
                 cd ${CUR_DIR}
 	fi
 }
 
+function EXIT
+{
+	if [[ ${1} != 0 ]]
+	then
+		ResourceRelease
+	fi
+
+	exit ${1}
+}
 
 function ReadStat
 {
@@ -69,7 +78,7 @@ export CMD_NAME=${0##*/}
 LogMessage "${CMD_NAME} started in $(date)"
 print 
 
-# Resource needed
+# Setup environment
 CUR_DIR=${PWD}
 
 if [[ -z $(echo ${0} |grep "/" 2>/dev/null) ]]
@@ -80,6 +89,7 @@ else
         ENV=${CUR_TOOLDIR}/config
 fi
 
+export PATH
 export RemoteCopyCommand=rcp
 RSH=rsh
 
@@ -88,11 +98,26 @@ RSH=rsh
 if [[ ${RemoteCopyCommand} == "scp" ]]
 then
 	RSH=ssh
+	export RCP_CMD=scp
+else
+	RSH=rsh
+	export RCP_CMD=rcp
 fi
 
-RCP=${CUR_TOOLDIR}/RCP
+RCP_SCR=${CUR_TOOLDIR}/RCP
 
 export DEBUG=$HOME/${CMD_NAME}.debug
+
+if [[ -d ${TEMP_WORKDIR} ]]
+then
+	export TEMP=${TEMP_WORKDIR}/split$$.$(date +%m%d)
+	export TEMPRCP=${TEMP}/.rcp
+	export TEMPRCPDEBUG=${TEMP}/.rcpdebug
+else
+	LogMessage "ERROR: Directory ${TEMP_WORKDIR} doesn't exist! Please correct it in config file!"
+	exit 1
+fi
+
 
 # Split file numbers
 integer NUM
@@ -106,6 +131,7 @@ DESTDIR=${4}
 #export TESTMODE="-T"
 export TESTMODE=
 
+DESTTEMP=${DESTDIR}/.ship$$.$(date +%m%d)
 ZIPFILE=$(basename ${INPUTFILE} 2>/dev/null) 
 ZIPDIR=$(dirname ${INPUTFILE} 2>/dev/null)
 
@@ -119,24 +145,28 @@ else
 
 fi
 
-export TEMP=${TEMP_WORKDIR}/split$$.$(date +%m%d)
-export TEMPRCP=${TEMP}/.rcp
-export TEMPRCPDEBUG=${TEMP}/.rcpdebug
-
-DESTTEMP=${DESTDIR}/.ship$$.$(date +%m%d)
+if [[ ${RSH} == ssh ]]
+then
+	RSH_FLAGS="-o PreferredAuthentications=publickey -o StrictHostKeyChecking=no"
+else
+	RSH_FLAGS=
+fi
 
 trap "ResourceRelease;kill 0;exit 1" 1 2 3 15
 
 if [[ ! -z ${TESTMODE} ]]
 then
 	touch $DEBUG
+else
+	[ -f $DEBUG ] && rm -f $DEBUG
 fi
 
 # Verify if remote operation is OK
+${RSH} ${RSH_FLAGS} ${REMOTE_SERVER} -l ${USER_ID} date > /dev/null 2>&1
 
-if [[ -z $(${RSH} ${REMOTE_SERVER} -l ${USER_ID} date 2>/dev/null) ]]
+if [[ $? != 0 ]]
 then
-	LogMessage "ERROR: Can't run ${RSH} successfully!"
+	LogMessage "ERROR: Can't run \"${RSH} ${RSH_FLAGS} ${REMOTE_SERVER} -l ${USER_ID} date\" successfully! Please setup ${RSH} access with no passwd required!\n"
 	exit 1
 fi
 
@@ -147,6 +177,19 @@ then
 	LogMessage "ERROR: Can't create ${TEMP}!"
 	exit 1
 fi
+
+# Verify if the remote directory is accessible or workable for scp or rcp.
+echo "# Remote RCP" > ${TEMP}/.rcp_test
+${RCP_CMD} ${TEMP}/.rcp_test ${USER_ID}@${REMOTE_SERVER}:${DESTDIR}/ > /dev/null 2>&1
+
+if [[ $? != 0 ]]
+then
+	LogMessage "ERROR: Can't run \"${RCP_CMD} ${TEMP}/.rcp_test ${USER_ID}@${REMOTE_SERVER}:${DESTDIR}/\" successfully! Please verify if remote directory is ${DESTDIR}/ accessible!\n"
+	EXIT 1
+else
+	${RSH} ${REMOTE_SERVER} -l ${USER_ID} rm -rf ${DESTDIR}/.rcp_test 2>/dev/null
+fi
+
 mkdir -p ${TEMPRCP}
 mkdir -p ${TEMPRCPDEBUG}
 
@@ -156,7 +199,7 @@ ${RSH} ${REMOTE_SERVER} -l ${USER_ID} mkdir -p ${DESTTEMP} 2>/dev/null
 if [[ -z $(${RSH} ${REMOTE_SERVER} -l ${USER_ID} ls -d ${DESTTEMP} 2>/dev/null) ]]
 then
 	LogMessage "ERROR: Can't run ${RSH} successfully!"
-	exit 1
+	EXIT 1
 fi
 
 
@@ -193,8 +236,7 @@ NUM=$(ls ${ZIPFILE}* 2>/dev/null |wc -l)
 if (( NUM == 0 ))
 then
 	LogMessage "ERROR: split failed!"
-	ResourceRelease
-	exit 1
+	EXIT 1
 fi
 
 cd ${CUR_DIR}
@@ -206,8 +248,8 @@ do
 	WriteStat ${TEMPRCP}/${i} "NS"
 done
 
-############  Split & rcp Module  ############ 
-DebugMessage "Start Split & rcp in $(date)"
+############  Split & RCP Module  ############ 
+DebugMessage "Start Split & ${RCP_CMD} in $(date)"
 
 integer success
 integer notstart
@@ -231,16 +273,16 @@ do
 		case ${RCPSTAT} in
 		    NS) 
 			let notstart++
-			DebugMessage "Background running ${RCP} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
-			${RCP} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
+			DebugMessage "Background running ${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
+			${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
 		     	;;	
 		    IP)
 			let inprog++
 			;;	
 		    FAIL)
 			let fail++
-			DebugMessage "Background running ${RCP} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
-			${RCP} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
+			DebugMessage "Background running ${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
+			${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
 			;;	
         	    CO)
 			let success++
@@ -263,6 +305,7 @@ do
 done
 
 DebugMessage "End Split & rcp in $(date)"
+
 ############  Post process Module ############ 
 DebugMessage "Start Post process in $(date)"
 
@@ -297,8 +340,7 @@ then
 		LogMessage "${ZIPFILE} was successfully shipped!"
 	else
 		LogMessage "ERROR: Sum value of ${ZIPFILE} didn't match, Please investigate!"
-		ResourceRelease
-		exit 1
+		EXIT 1
 	fi
 else
 	DebugMessage "Test mode skip sum checking"
