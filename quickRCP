@@ -1,19 +1,18 @@
 #!/bin/ksh93
 
-###################################################
-# Descriptions: If you experienced several hours  #
-#               or even longer to ship a large    #
-#               file from one UNIX or Linux server#
-#               to another, try this script.      #
-#						  #
-#               An example for such needs may be  #
-#               that the binary software load need# 
-#               to be shipped from one country to #
-#               another periodically for a global #
-#               development team.                 #
-#						  #
-#						  #
-###################################################
+#########################################################################
+# Descriptions: If you experienced several hours or even longer to ship #
+#               a large file from one UNIX or Linux server to another,  #
+#               try this script.                                        #
+#                                                                       #
+#               An example -  the binary software delivery load need to #
+#               be shipped from one country to another periodically for #
+#               a global development team.                              #
+#               development team.                                       #
+#                                                                       #
+#	        Author: Jason Feng                                      #
+#                                                                       #
+#########################################################################
 
 
 ############  Sub functions ############ 
@@ -92,9 +91,8 @@ function ErrorHandle
 	ResourceRelease
 }
 
-############  Intilaizing Module  ############ 
+############  Preparation Module  ############ 
 export CMD_NAME=${0##*/}
-
 
 LogMessage "${CMD_NAME} started in $(date)"
 print 
@@ -167,7 +165,6 @@ else
 	ORIG_SUM_T=$(sum -r  ${ZIPDIR}/${ZIPFILE} 2>/dev/null )
 	ORIG_SUM=${ORIG_SUM_T%% *}
 	DebugMessage "ORIG_SUM is ${ORIG_SUM}"
-
 fi
 
 if [[ ${RSH} == ssh ]]
@@ -227,7 +224,6 @@ then
 	EXIT 1
 fi
 
-
 if [[ -z $TESTMODE ]]
 then
         if [[ ${SPLITMETHOD} == "SIZE" ]] 
@@ -252,7 +248,6 @@ else
 		print "Test mode ${x}" > ${TEMP}/${ZIPFILE}${x}
 	done
 fi
-
 
 cd $TEMP
 NAMELIST=$(ls ${ZIPFILE}* 2>/dev/null)
@@ -284,7 +279,6 @@ integer fatal=0
 integer MAX_FAILURE=3
 RCPSTAT=
 RCP_PID=AAAAA
-
 
 DebugMessage "Split files number is ${NUM}"
 
@@ -342,7 +336,7 @@ done
 
 DebugMessage "End Split & rcp in $(date)"
 
-############  Post process Module ############ 
+############  Post-processing Module ############ 
 DebugMessage "Start Post process in $(date)"
 
 if (( success == NUM ))
