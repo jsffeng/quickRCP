@@ -39,12 +39,12 @@ DebugMessage "Running rcp ${@:-}"
 #rcp  "${@:-}"
 #scp  "${@:-}"
 
-if [[ -z ${RemoteCopyCommand} ]]
+if [[ -z ${RCP_CMD} ]]
 then
-	RemoteCopyCommand=rcp
+	RCP_CMD=rcp
 fi
 
-${RemoteCopyCommand} "${@:-}"
+${RCP_CMD} "${@:-}"
 RET=$?
 DebugMessage "Return value is $RET"
 
