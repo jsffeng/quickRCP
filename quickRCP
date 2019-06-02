@@ -162,7 +162,10 @@ then
 	LogMessage "ERROR: Can't find  ${ZIPFILE} under ${ZIPDIR}!"
 	exit 1
 else
-	ORIG_SUM=$(sum -r  ${ZIPDIR}/${ZIPFILE} 2>/dev/null )
+ 	# "sum -r" output format is different between Linux and Solaris
+	# Just use the first field sum value and remove the rest
+	ORIG_SUM_T=$(sum -r  ${ZIPDIR}/${ZIPFILE} 2>/dev/null )
+	ORIG_SUM=${ORIG_SUM_T%% *}
 	DebugMessage "ORIG_SUM is ${ORIG_SUM}"
 
 fi
@@ -365,8 +368,10 @@ fi
 # Sum Checking
 if [[ -z $TESTMODE ]]
 then
-	NEW_SUM=$(${RSH} ${REMOTE_SERVER} -l ${USER_ID} sum -r ${DESTDIR}/${ZIPFILE}  2>/dev/null)
-	NEW_SUM=${NEW_SUM%%\/*}
+ 	# "sum -r" output format is different between Linux and Solaris
+	# Just use the first field sum value and remove the rest
+	NEW_SUM_T=$(${RSH} ${REMOTE_SERVER} -l ${USER_ID} sum -r ${DESTDIR}/${ZIPFILE}  2>/dev/null)
+	NEW_SUM=${NEW_SUM_T%% *}
 	DebugMessage "NEW_SUM is ${NEW_SUM}"
 	if [[ ${ORIG_SUM} == ${NEW_SUM} ]]
 	then
