@@ -14,5 +14,8 @@ SPLITNUMBER=5
 SPLITBYTE=10m
 
 # Specify RemoteCopyCommand=[rcp|scp]
-#RemoteCopyCommand=scp
-RemoteCopyCommand=rcp
+RemoteCopyCommand=scp
+#RemoteCopyCommand=rcp
+
+# PATH
+PATH=/bin:/usr/bin:$PATH
