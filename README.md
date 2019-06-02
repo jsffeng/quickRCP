@@ -20,4 +20,11 @@ Following option has default value in config file, but can be overwritten by com
 Example:  
 quickRCP -f \<filename\> -c  \<remote login\>@\<remote hostname or IP\>:\<remote dir\>  
 quickRCP -f \<filename\> -h \<remote hostname or IP\> -u \<remote login\> -p \<remote dir\>  
-  
+
+
+Test environment:
+1. ubuntu server -> ubuntu server
+2. Solaris server -> Solaris server 
+3. ubuntu server to Solaris server not tested
+	- One difference between the two system is the result of "sum -r", this can be handled by the tool.
+	- Not sure whether there are other diferences for the commands.
