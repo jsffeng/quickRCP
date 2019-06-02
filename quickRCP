@@ -5,10 +5,9 @@
 #               a large file from one UNIX or Linux server to another,  #
 #               try this script.                                        #
 #                                                                       #
-#               An example -  the binary software delivery load need to #
+#               An example - the binary software delivery load need to  #
 #               be shipped from one country to another periodically for #
 #               a global development team.                              #
-#               development team.                                       #
 #                                                                       #
 #	        Author: Jason Feng                                      #
 #                                                                       #
