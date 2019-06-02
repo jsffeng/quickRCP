@@ -8,10 +8,10 @@ TIMER=5
 SPLITMETHOD=NUMBER
 
 # If SPLITMETHOD=NUMBER, must set SPLITNUMBER, and SPLITBYTE will be ignored.
-SPLITNUMBER=5
+SPLITNUMBER=10
 
 # If SPLITMETHOD=SIZE, must set SPLITBYTE, and SPLITNUMBER will be ignored.
-SPLITBYTE=10m
+SPLITBYTE=50m
 
 # Specify RemoteCopyCommand=[rcp|scp]
 RemoteCopyCommand=scp
