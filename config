@@ -1,0 +1,18 @@
+# Need have adequate space to temporarily hold the large file before shipping
+TEMP_WORKDIR=/tmp
+
+# Seconds for periodical checks on if shipping completed.
+TIMER=5
+
+# Specify SPLITMETHOD=[NUMBER|SIZE]
+SPLITMETHOD=NUMBER
+
+# If SPLITMETHOD=NUMBER, must set SPLITNUMBER, and SPLITBYTE will be ignored.
+SPLITNUMBER=5
+
+# If SPLITMETHOD=SIZE, must set SPLITBYTE, and SPLITNUMBER will be ignored.
+SPLITBYTE=10m
+
+# Specify RemoteCopyCommand=[rcp|scp]
+#RemoteCopyCommand=scp
+RemoteCopyCommand=rcp
