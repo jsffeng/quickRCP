@@ -9,7 +9,7 @@ quickRCP  options:
 	-u:  
 	-p:  
         -c: <remote ogin>@<remote hostname or IP>:<remote path>  
-	-T: test mode, for debugging purpose  
+	-T: test mode, only for debugging purpose. Used by tool adminstrator only.
 Following option has default value in config file, but can be overwritten by command lines. If such parameter has no change every time, suggest to update config file as one time effort.  
 	-m: scp or rcp, default defined in config  
 	-t: Seconds for periodical checks on if shipping complete  

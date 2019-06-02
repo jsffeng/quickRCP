@@ -10,8 +10,13 @@ function DebugMessage
 }
 function WriteStat
 {
-		DebugMessage "${1} has been changed to ${2}"
+	DebugMessage "${1} has been changed in ${2}"
+	if [[ -z ${3} ]]
+	then
 		print ${2} > ${1}
+	else
+		print "${2};${3}" > ${1}
+	fi
 }
 
 FILENAME=${1##*/}
@@ -33,11 +38,9 @@ fi
 
 trap "print FAIL > ${STAT};kill 0;exit 1"  1 2 3 15
 
-WriteStat ${STAT} "IP"
+WriteStat ${STAT} "IP" "$$"
 
 DebugMessage "Running rcp ${@:-}"
-#rcp  "${@:-}"
-#scp  "${@:-}"
 
 if [[ -z ${RCP_CMD} ]]
 then

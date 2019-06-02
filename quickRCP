@@ -31,8 +31,14 @@ function DebugMessage
 	fi
 }
 
-function ResourceRelease
+# $1=0 for normal completion, otherwise for abormal completion
+function ResourceRelease 
 {
+	if [[ ${1} != 0 ]]
+	then
+		ps --ppid $$| awk '{if($1~/[0-9]+/) print $1}'| xargs kill -9 >/dev/null 2<&1
+	fi
+
 	if [[ ! -f ${DEBUG} ]]
 	then
 		# Release resource, in case ssh requiring password use RSH_FLAGS here
@@ -40,6 +46,9 @@ function ResourceRelease
 		cd ${TEMP_WORKDIR}
 		rm -rf $TEMP
                 cd ${CUR_DIR}
+	else
+		# Do nothing but remove DEBUG flag file
+		rm -f $DEBUG
 	fi
 }
 
@@ -55,20 +64,32 @@ function EXIT
 
 function ReadStat
 {
-	RCPSTAT=$(cat $1)
+	RCPSTAT_T=$(cat $1)
+	if [[ -z $(echo ${RCPSTAT_T}|grep ";" 2>/dev/null) ]]
+	then
+		RCPSTAT=${RCPSTAT_T}
+		RCP_PID=AAAAA
+	else
+		RCPSTAT=${RCPSTAT_T%%;*}
+		RCP_PID=${RCPSTAT_T##*;}
+	fi
 }
 
 function WriteStat
 {
-	DebugMessage "${1} has been changed to ${2}"
-	print "${2}" > ${1}
+	DebugMessage "${1} has been changed in ${2}"
+	if [[ -z ${3} ]]
+	then
+		print "${2}" > ${1}
+	else
+		print "${2};${3}" > ${1}
+	fi
 }
 
 function ErrorHandle
 {
 	print "ERROR: Error type is ${1}"
 	ResourceRelease
-	
 }
 
 ############  Intilaizing Module  ############ 
@@ -83,17 +104,19 @@ CUR_DIR=${PWD}
 
 if [[ -z $(echo ${0} |grep "/" 2>/dev/null) ]]
 then
-	ENV=config
+	ENV_SET=config
+	RCP_SCR=RCP
 else
 	CUR_TOOLDIR=$(dirname ${0} 2>/dev/null)
-        ENV=${CUR_TOOLDIR}/config
+        ENV_SET=${CUR_TOOLDIR}/config
+	RCP_SCR=${CUR_TOOLDIR}/RCP
 fi
 
 export PATH
 export RemoteCopyCommand=rcp
 RSH=rsh
 
-. ${ENV}
+. ${ENV_SET}
 
 if [[ ${RemoteCopyCommand} == "scp" ]]
 then
@@ -103,8 +126,6 @@ else
 	RSH=rsh
 	export RCP_CMD=rcp
 fi
-
-RCP_SCR=${CUR_TOOLDIR}/RCP
 
 export DEBUG=$HOME/${CMD_NAME}.debug
 
@@ -127,7 +148,8 @@ INPUTFILE=${1}
 REMOTE_SERVER=${2}
 USER_ID=${3}
 DESTDIR=${4}
-#Set TESTMODE will be a quick way to test without shipping the large files
+# Set TESTMODE will be a quick way to test with shipping fake files with smaller size
+# This is efficient compared to debugging a problem with shipping a real large file
 #export TESTMODE="-T"
 export TESTMODE=
 
@@ -256,7 +278,9 @@ integer notstart
 integer inprog
 integer fail=0
 integer fatal=0
+integer MAX_FAILURE=3
 RCPSTAT=
+RCP_PID=AAAAA
 
 
 DebugMessage "Split files number is ${NUM}"
@@ -277,7 +301,16 @@ do
 			${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
 		     	;;	
 		    IP)
-			let inprog++
+			if [[ -d /proc/${RCP_PID} ]]
+			then
+				# Process is alive
+				let inprog++
+			else
+				# Process has died
+				let fail++
+				DebugMessage "Background running ${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
+				${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
+			fi
 			;;	
 		    FAIL)
 			let fail++
@@ -296,7 +329,7 @@ do
 
 	DebugMessage "NS=${notstart} IP=${inprog} CO=${success} FAIL=${fail} FATAL=${fatal}"
 
-	if (( success < NUM && fail< NUM && fatal == 0 ))
+	if (( success < NUM && fail < MAX_FAILURE && fatal == 0 ))
 	then
 		sleep $TIMER
 	else
@@ -315,7 +348,7 @@ then
 	DebugMessage "Running: ${RSH} ${REMOTE_SERVER} -l ${USER_ID} \"cat ${DESTTEMP}/${ZIPFILE}* > ${DESTDIR}/${ZIPFILE} 2>/dev/null\""
 	${RSH} ${REMOTE_SERVER} -l ${USER_ID} "cat ${DESTTEMP}/${ZIPFILE}* > ${DESTDIR}/${ZIPFILE} 2>/dev/null"
 	
-elif (( fail == NUM ))
+elif (( fail == MAX_FAILURE ))
 then
 	ErrorHandle 1 
 	exit 1
@@ -348,7 +381,7 @@ fi
 
 DebugMessage "End Post process in $(date)"
 
-ResourceRelease
+ResourceRelease 0
 
 LogMessage "${CMD_NAME} completed in $(date)"
 
