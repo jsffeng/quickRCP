@@ -1,0 +1,313 @@
+#!/bin/ksh93
+
+###################################################
+# Descriptions: If you experienced several hours  #
+#               or even longer to ship a large    #
+#               file from one UNIX or Linux server#
+#               to another, try this script.      #
+#						  #
+#               An example for such needs may be  #
+#               that the binary software load need# 
+#               to be shipped from one country to #
+#               another periodically within a     #
+#               global development team.          #
+#						  #
+#						  #
+###################################################
+
+
+############  Sub functions ############ 
+
+function LogMessage
+{
+	print $@
+}
+
+function DebugMessage
+{
+	if [[ -f ${DEBUG} ]]
+	then
+		print $@
+	fi
+}
+
+function ResourceRelease
+{
+	if [[ ! -f ${DEBUG} ]]
+	then
+		# Release resource
+		${RSH} ${REMOTE_SERVER} -l ${USER_ID} rm -rf ${DESTDIR}/.ship* 2>/dev/null
+		cd ${TEMP_WORKDIR}
+		rm -rf $TEMP
+                cd ${CUR_DIR}
+	fi
+}
+
+
+function ReadStat
+{
+	RCPSTAT=$(cat $1)
+}
+
+function WriteStat
+{
+	DebugMessage "${1} has been changed to ${2}"
+	print "${2}" > ${1}
+}
+
+function ErrorHandle
+{
+	print "ERROR: Error type is ${1}"
+	ResourceRelease
+	
+}
+
+############  Intilaizing Module  ############ 
+export CMD_NAME=${0##*/}
+
+
+LogMessage "${CMD_NAME} started in $(date)"
+print 
+
+# Resource needed
+CUR_DIR=${PWD}
+
+if [[ -z $(echo ${0} |grep "/" 2>/dev/null) ]]
+then
+	ENV=config
+else
+	CUR_TOOLDIR=$(dirname ${0} 2>/dev/null)
+        ENV=${CUR_TOOLDIR}/config
+fi
+
+export RemoteCopyCommand=rcp
+RSH=rsh
+
+. ${ENV}
+
+if [[ ${RemoteCopyCommand} == "scp" ]]
+then
+	RSH=ssh
+fi
+
+RCP=${CUR_TOOLDIR}/RCP
+
+export DEBUG=$HOME/${CMD_NAME}.debug
+
+# Split file numbers
+integer NUM
+
+# Command line input
+INPUTFILE=${1}
+REMOTE_SERVER=${2}
+USER_ID=${3}
+DESTDIR=${4}
+#Set TESTMODE will be a quick way to test without shipping the large files
+#export TESTMODE="-T"
+export TESTMODE=
+
+ZIPFILE=$(basename ${INPUTFILE} 2>/dev/null) 
+ZIPDIR=$(dirname ${INPUTFILE} 2>/dev/null)
+
+if [[ ! -f ${ZIPDIR}/${ZIPFILE} ]]
+then
+	LogMessage "ERROR: Can't find  ${ZIPFILE} under ${ZIPDIR}!"
+	exit 1
+else
+	ORIG_SUM=$(sum -r  ${ZIPDIR}/${ZIPFILE} 2>/dev/null )
+	DebugMessage "ORIG_SUM is ${ORIG_SUM}"
+
+fi
+
+export TEMP=${TEMP_WORKDIR}/split$$.$(date +%m%d)
+export TEMPRCP=${TEMP}/.rcp
+export TEMPRCPDEBUG=${TEMP}/.rcpdebug
+
+DESTTEMP=${DESTDIR}/.ship$$.$(date +%m%d)
+
+trap "ResourceRelease;kill 0;exit 1" 1 2 3 15
+
+if [[ ! -z ${TESTMODE} ]]
+then
+	touch $DEBUG
+fi
+
+# Verify if remote operation is OK
+
+if [[ -z $(${RSH} ${REMOTE_SERVER} -l ${USER_ID} date 2>/dev/null) ]]
+then
+	LogMessage "ERROR: Can't run ${RSH} successfully!"
+	exit 1
+fi
+
+mkdir -p ${TEMP} 
+
+if [[ ! -d ${TEMP} ]]
+then
+	LogMessage "ERROR: Can't create ${TEMP}!"
+	exit 1
+fi
+mkdir -p ${TEMPRCP}
+mkdir -p ${TEMPRCPDEBUG}
+
+${RSH} ${REMOTE_SERVER} -l ${USER_ID} rm -rf ${DESTDIR}/.ship* 2>/dev/null
+${RSH} ${REMOTE_SERVER} -l ${USER_ID} mkdir -p ${DESTTEMP} 2>/dev/null
+
+if [[ -z $(${RSH} ${REMOTE_SERVER} -l ${USER_ID} ls -d ${DESTTEMP} 2>/dev/null) ]]
+then
+	LogMessage "ERROR: Can't run ${RSH} successfully!"
+	exit 1
+fi
+
+
+if [[ -z $TESTMODE ]]
+then
+        if [[ ${SPLITMETHOD} == "SIZE" ]] 
+	then
+		if [[ -z ${SPLITBYTE} ]]
+		then
+			SPLITBYTE=100m
+		fi
+
+		split -b ${SPLITBYTE} ${ZIPDIR}/${ZIPFILE} ${TEMP}/${ZIPFILE}
+	else
+		if [[ -z ${SPLITNUMBER} ]]
+		then
+			SPLITNUMBER=10
+		fi
+
+		split -n ${SPLITNUMBER} ${ZIPDIR}/${ZIPFILE} ${TEMP}/${ZIPFILE}
+	fi
+else
+	for x in a b c d
+	do
+		print "Test mode ${x}" > ${TEMP}/${ZIPFILE}${x}
+	done
+fi
+
+
+cd $TEMP
+NAMELIST=$(ls ${ZIPFILE}* 2>/dev/null)
+NUM=$(ls ${ZIPFILE}* 2>/dev/null |wc -l)
+
+if (( NUM == 0 ))
+then
+	LogMessage "ERROR: split failed!"
+	ResourceRelease
+	exit 1
+fi
+
+cd ${CUR_DIR}
+
+DebugMessage "${ZIPFILE} were splitted as ${NAMELIST}!"
+
+for i in ${NAMELIST}
+do
+	WriteStat ${TEMPRCP}/${i} "NS"
+done
+
+############  Split & rcp Module  ############ 
+DebugMessage "Start Split & rcp in $(date)"
+
+integer success
+integer notstart
+integer inprog
+integer fail=0
+integer fatal=0
+RCPSTAT=
+
+
+DebugMessage "Split files number is ${NUM}"
+
+while true
+do
+	success=0
+	notstart=0
+	inprog=0
+
+	for i in ${NAMELIST}
+	do
+		ReadStat ${TEMPRCP}/$i
+		case ${RCPSTAT} in
+		    NS) 
+			let notstart++
+			DebugMessage "Background running ${RCP} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
+			${RCP} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
+		     	;;	
+		    IP)
+			let inprog++
+			;;	
+		    FAIL)
+			let fail++
+			DebugMessage "Background running ${RCP} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
+			${RCP} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
+			;;	
+        	    CO)
+			let success++
+			;;	
+		    *)	
+			DebugMessage "ERROR: Abnormal RCPSTAT=${RCPSTAT}!"
+			let fatal++
+			;;	
+		esac
+	done
+
+	DebugMessage "NS=${notstart} IP=${inprog} CO=${success} FAIL=${fail} FATAL=${fatal}"
+
+	if (( success < NUM && fail< NUM && fatal == 0 ))
+	then
+		sleep $TIMER
+	else
+		break
+	fi
+done
+
+DebugMessage "End Split & rcp in $(date)"
+############  Post process Module ############ 
+DebugMessage "Start Post process in $(date)"
+
+if (( success == NUM ))
+then
+# Merge remotely	
+	DebugMessage "Running: ${RSH} ${REMOTE_SERVER} -l ${USER_ID} \"cat ${DESTTEMP}/${ZIPFILE}* > ${DESTDIR}/${ZIPFILE} 2>/dev/null\""
+	${RSH} ${REMOTE_SERVER} -l ${USER_ID} "cat ${DESTTEMP}/${ZIPFILE}* > ${DESTDIR}/${ZIPFILE} 2>/dev/null"
+	
+elif (( fail == NUM ))
+then
+	ErrorHandle 1 
+	exit 1
+elif (( fatal != 0 ))
+then
+	ErrorHandle 2
+	exit 1
+
+else
+	ErrorHandle 3 
+	exit 1
+fi
+
+# Sum Checking
+if [[ -z $TESTMODE ]]
+then
+	NEW_SUM=$(${RSH} ${REMOTE_SERVER} -l ${USER_ID} sum -r ${DESTDIR}/${ZIPFILE}  2>/dev/null)
+	NEW_SUM=${NEW_SUM%%\/*}
+	DebugMessage "NEW_SUM is ${NEW_SUM}"
+	if [[ ${ORIG_SUM} == ${NEW_SUM} ]]
+	then
+		LogMessage "${ZIPFILE} was successfully shipped!"
+	else
+		LogMessage "ERROR: Sum value of ${ZIPFILE} didn't match, Please investigate!"
+		ResourceRelease
+		exit 1
+	fi
+else
+	DebugMessage "Test mode skip sum checking"
+fi
+
+DebugMessage "End Post process in $(date)"
+
+ResourceRelease
+
+LogMessage "${CMD_NAME} completed in $(date)"
+
+exit 0
