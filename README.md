@@ -1,4 +1,4 @@
-Tool usage:  
+Tool Usage:  
 ------------  
 USAGE:  quickRCP -f \<file name\> [-h \<remote host\>]  
 		[-u \<remote login\>] [-d \<remote dir\>]  
@@ -31,16 +31,23 @@ Examples:
 	 quickRCP -f file1.cpio -h 192.168.1.90 -u username -d /usr/tmp -m scp  
 	 quickRCP -f file1.cpio -c username@192.168.1.90:/usr/tmp  
   
-Dependent packages & tools:  
+Development Environment:  
+----------------------  
+- Initial version developed on Solaris 10 server, support rsh/rcp and basic sun day scenarios, but not support:  
+	- ssh/scp,rainy day handling, Config file and related options, command line interface, etc.  
+- Full version developed on Linux ubuntu 16.04.01.  
+  
+Dependent packages/tools:
 ----------------------  
 - Korn Shell - /bin/ksh93  
 - rsh or ssh  
-- tools: split, awk  
+- awk
+- tools - split, sum
   
 Test environment:  
 -------------------  
-- ubuntu server -> ubuntu server, yes  
-- Solaris server -> Solaris server, to-do  
-- ubuntu server to Solaris server not tested  
-	- One difference between the two system is the result of "sum -r", this can be handled by the tool.  
-	- Not sure whether there are other diferences for the commands.  
+- From ubuntu server to ubuntu server, test pass    
+- From Solaris server to Solaris server, to-do  
+- From ubuntu server to Solaris server, no plan to test    
+	- One difference between the two systems is the result of "sum -r", this can be handled by the tool.  
+	- If there is such need, need to test to see if any further modification is required   
