@@ -47,8 +47,8 @@ Dependent packages/tools:
   
 Test environment:  
 -------------------  
-- From ubuntu server to ubuntu server, test pass    
+- From Linux (ubuntu) server to Linux (ubuntu) server, test pass    
 - From Solaris server to Solaris server, to-do  
-- From ubuntu server to Solaris server, no plan to test    
-	- One difference between the two systems is the result of "sum -r", this can be handled by the tool.  
-	- If there is such need, need to test to see if any further modification is required   
+- From Linux (ubuntu) server to Solaris server, no plan to test    
+	- One difference between the two systems is the result of "sum -r", and now tool can handle it.     
+	- A further testing is needed if intending to use it between Linux and Solaris or other UNIX servers.     
