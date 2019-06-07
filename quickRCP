@@ -16,6 +16,16 @@
 
 ############  Sub functions ############ 
 
+function usage
+{
+	if (( ${#} > 0 ))
+	then
+		print -u2 "Error: ${CMD_NAME}: ${@}"
+	fi
+	print "${USAGE}"
+	exit ${#}
+}
+
 function LogMessage
 {
 	print $@
@@ -29,7 +39,7 @@ function DebugMessage
 	fi
 }
 
-# $1=0 for normal completion, otherwise for abormal completion
+# Set $1 as 0 for normal completion, otherwise for abormal completion
 function ResourceRelease 
 {
 	if [[ ${1} != 0 ]]
@@ -68,8 +78,8 @@ function ReadStat
 		RCPSTAT=${RCPSTAT_T}
 		RCP_PID=AAAAA
 	else
-		RCPSTAT=${RCPSTAT_T%%;*}
-		RCP_PID=${RCPSTAT_T##*;}
+		RCPSTAT=${RCPSTAT_T%%\;*}
+		RCP_PID=${RCPSTAT_T##*\;}
 	fi
 }
 
@@ -90,14 +100,59 @@ function ErrorHandle
 	ResourceRelease
 }
 
-############  Preparation Module  ############ 
+############  Command Interface Module  ############ 
 export CMD_NAME=${0##*/}
 
-LogMessage "${CMD_NAME} started in $(date)"
-print 
+USAGE="
+USAGE:  ${CMD_NAME} -f <file name> [-h <remote host>]
+		[-u <remote login>] [-d <remote dir>]
+		[-c <remote login>@<remote host>:<remote dir>]
+		[-m <method>] [-t <time>] [-M <split mode>]
+		[-N <split number>] [-S <split size>]
+		[-T] [-H]
+Regular options:
+	-f 	file name for shipping,required option
+	-h	remote host name or IP
+	-u	remote login
+	-d	remote directory
+	-c	if this option is used, option -h,-u,-d should not be used
+	-T	test mode, only used by tool adminstrator for quick debugging 
+	-H	print usage message
+Alternative options:
+	-m	shipping mothod, valid value is [rcp|scp]
+	-t	seconds for periodical checks for shipping completion
+	-M	split mode, valid value is [NUMBER|SIZE]
+	-N	split number, when -s0 specify num, split input file with this number, example 10
+	-S	byte of split size, when -s0 specify size, split input file with this size, example 100m 
 
-# Setup environment
+NOTE: 	All alternative options have default value in config file, and can be used to 
+	overwrite the default value by command line. However, to update config file 
+	with new default value may be a simpler way to achieve the same.
+
+Example:
+	 ${CMD_NAME} -f file1.cpio -h 192.168.1.90 -u username -d /usr/tmp -m scp
+	 ${CMD_NAME} -f file1.cpio -c username@192.168.1.90:/usr/tmp
+"
+
+unset 	\
+	INPUTFILE		\
+	REMOTE_SERVER		\
+	USER_ID			\
+	DESTDIR			\
+	REMOTE_ACCESS		\
+	RemoteCopyMethod	\
+	TIMER			\
+	SPLIT_MODE		\
+	SPLIT_NUMBER		\
+	SPLIT_SIZE		\
+	TESTMODE
+
 CUR_DIR=${PWD}
+
+if [[ -z "$@" ]]
+then
+	usage "options missing!"
+fi
 
 if [[ -z $(echo ${0} |grep "/" 2>/dev/null) ]]
 then
@@ -110,19 +165,155 @@ else
 fi
 
 export PATH
-export RemoteCopyCommand=rcp
-RSH=rsh
+export RemoteCopyMethod
+# Set TESTMODE will be a quick way to test with shipping fake files with smaller size
+# This is efficient compared to debugging a problem with shipping a real large file
+export TESTMODE
 
 . ${ENV_SET}
 
-if [[ ${RemoteCopyCommand} == "scp" ]]
+OPT_PASS=YES
+integer opt_num=0
+integer opt_combine_num=0
+
+while getopts :f:h:u:d:c:m:t:M:N:S:TH? OPT
+do
+	case ${OPT} in
+	f)	INPUTFILE=${OPTARG}
+		;;
+	h)	REMOTE_SERVER=${OPTARG}
+		let opt_num++
+		;;
+	u)	USER_ID=${OPTARG}
+		let opt_num++
+		;;
+	d)	DESTDIR=${OPTARG}
+		let opt_num++
+		;;
+	c)	REMOTE_ACCESS=${OPTARG}
+		let opt_combine_num++
+		;;
+	m)	RemoteCopyMethod=${OPTARG}
+		;;
+	t)	TIMER=${OPTARG}
+		;;
+	M)	SPLIT_MODE=${OPTARG}
+		;;
+	N)	SPLIT_NUMBER=${OPTARG}
+		;;
+	S)	SPLIT_SIZE=${OPTARG}
+		;;
+	T)	TESTMODE=-T
+		;;
+	H)	usage
+		;;
+	:)	usage option -$OPTARG requires an argument.
+		;;
+	?)	usage unknown option: -$OPTARG
+		;;
+	esac
+done
+
+shift $(($OPTIND - 1))
+
+if [[ ! -z "$@" ]]
+then
+	usage unknown option: "$@"	
+fi
+
+# Perform validity checks.
+
+if [[ -z ${INPUTFILE} ]]
+then
+	usage "option '-f <file name>' always required!"
+fi
+
+if (( opt_combine_num == 0 ))
+then
+	if (( opt_num !=3 ))
+	then
+		usage "options missing!"
+	fi
+elif (( opt_combine_num == 1 ))
+then
+	if (( opt_num !=0 ))
+	then
+		usage "options conflict!"
+	fi
+
+	if [[ -n $(echo ${REMOTE_ACCESS} | grep @ 2>/dev/null) && -n $(echo ${REMOTE_ACCESS} | grep : 2>/dev/null) ]]
+	then
+		REMOTE_SERVER=${REMOTE_ACCESS%%@*}
+		REST_REMOTE_ACCESS=${REMOTE_ACCESS##*@}
+		USER_ID=${REST_REMOTE_ACCESS%%:*}
+		DESTDIR=${REST_REMOTE_ACCESS##*:}
+	else
+		usage "bad -c argument!"
+	fi
+else
+	# Should not reach here
+	usage "bad options!"
+fi
+
+if [[ -z ${REMOTE_SERVER} || -z ${USER_ID} || -z ${DESTDIR} ]]
+then
+	usage "wrong options!"
+fi
+
+if [[ ${RemoteCopyMethod} == "scp" ]]
 then
 	RSH=ssh
 	export RCP_CMD=scp
-else
+elif [[ ${RemoteCopyMethod} == "rcp" ]]
+then
 	RSH=rsh
 	export RCP_CMD=rcp
+else
+	LogMessage "ERROR: RemoteCopyMethod cannot be any other value except scp or rcp!"
+	exit 1
 fi
+
+if [[ -z ${TIMER} || ! -z ${TIMER//[0-9]} ]]
+then
+	LogMessage "ERROR: TIMER must be a natural number!"
+	exit 1
+fi
+
+if [[ ${SPLIT_MODE} == "NUMBER" ]]
+then
+	if [[ -z ${SPLIT_NUMBER} || ! -z ${SPLIT_NUMBER//[0-9]} ]]
+	then
+		LogMessage "ERROR: SPLIT_NUMBER must be a natural number!"
+		exit 1
+	fi
+elif [[ ${SPLIT_MODE} != "SIZE" ]]
+then
+	SIZE_SUFIX=${SPLIT_SIZE:0-1:0-1}
+	
+	if [[ SIZE_SUFIX =~ [0-9] ]]
+	then
+		SIZE_VALUE=${SPLIT_SIZE}
+	elif [[ SIZE_SUFIX =~ [k,K,m,M] ]]
+	then
+		SIZE_VALUE=${SPLIT_SIZE%${SIZE_SUFIX}}
+	else
+		LogMessage "ERROR: Invalid SPLIT_SIZE, e.g. 100000000,100000k,100m!"
+		exit 1
+	fi
+	
+	if [[ -z ${SIZE_VALUE} || ! -z ${SIZE_VALUE//[0-9]} ]]
+	then
+		LogMessage "ERROR: Invalid SPLIT_SIZE, e.g. 100000000,100000k,100m!"
+		exit 1
+	fi
+else
+	LogMessage "ERROR: SPLIT_MODE cannot be any other value except NUMBER or SIZE!"
+	exit 1
+fi
+
+############  Preparation Module  ############ 
+LogMessage "${CMD_NAME} started in $(date)"
+print 
 
 export DEBUG=$HOME/${CMD_NAME}.debug
 
@@ -135,20 +326,6 @@ else
 	LogMessage "ERROR: Directory ${TEMP_WORKDIR} doesn't exist! Please correct it in config file!"
 	exit 1
 fi
-
-
-# Split file numbers
-integer NUM
-
-# Command line input
-INPUTFILE=${1}
-REMOTE_SERVER=${2}
-USER_ID=${3}
-DESTDIR=${4}
-# Set TESTMODE will be a quick way to test with shipping fake files with smaller size
-# This is efficient compared to debugging a problem with shipping a real large file
-#export TESTMODE="-T"
-export TESTMODE=
 
 DESTTEMP=${DESTDIR}/.ship$$.$(date +%m%d)
 ZIPFILE=$(basename ${INPUTFILE} 2>/dev/null) 
@@ -225,21 +402,21 @@ fi
 
 if [[ -z $TESTMODE ]]
 then
-        if [[ ${SPLITMETHOD} == "SIZE" ]] 
+        if [[ ${SPLIT_MODE} == "SIZE" ]] 
 	then
-		if [[ -z ${SPLITBYTE} ]]
+		if [[ -z ${SPLIT_SIZE} ]]
 		then
-			SPLITBYTE=100m
+			SPLIT_SIZE=100m
 		fi
 
-		split -b ${SPLITBYTE} ${ZIPDIR}/${ZIPFILE} ${TEMP}/${ZIPFILE}
+		split -b ${SPLIT_SIZE} ${ZIPDIR}/${ZIPFILE} ${TEMP}/${ZIPFILE}
 	else
-		if [[ -z ${SPLITNUMBER} ]]
+		if [[ -z ${SPLIT_NUMBER} ]]
 		then
-			SPLITNUMBER=10
+			SPLIT_NUMBER=10
 		fi
 
-		split -n ${SPLITNUMBER} ${ZIPDIR}/${ZIPFILE} ${TEMP}/${ZIPFILE}
+		split -n ${SPLIT_NUMBER} ${ZIPDIR}/${ZIPFILE} ${TEMP}/${ZIPFILE}
 	fi
 else
 	for x in a b c d
@@ -247,6 +424,9 @@ else
 		print "Test mode ${x}" > ${TEMP}/${ZIPFILE}${x}
 	done
 fi
+
+# Split file numbers
+integer NUM
 
 cd $TEMP
 NAMELIST=$(ls ${ZIPFILE}* 2>/dev/null)
@@ -327,7 +507,7 @@ do
 
 	if (( success < NUM && fail < MAX_FAILURE && fatal == 0 ))
 	then
-		sleep $TIMER
+		sleep ${TIMER}
 	else
 		break
 	fi

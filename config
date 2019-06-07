@@ -4,18 +4,18 @@ TEMP_WORKDIR=/tmp
 # Seconds for periodical checks on if shipping completed.
 TIMER=5
 
-# Specify SPLITMETHOD=[NUMBER|SIZE]
-SPLITMETHOD=NUMBER
+# Specify SPLIT_MODE=[NUMBER|SIZE]
+SPLIT_MODE=NUMBER
 
-# If SPLITMETHOD=NUMBER, must set SPLITNUMBER, and SPLITBYTE will be ignored.
-SPLITNUMBER=10
+# If SPLIT_MODE=NUMBER, must set SPLIT_NUMBER, and SPLIT_SIZE will be ignored.
+SPLIT_NUMBER=10
 
-# If SPLITMETHOD=SIZE, must set SPLITBYTE, and SPLITNUMBER will be ignored.
-SPLITBYTE=50m
+# If SPLIT_MODE=SIZE, must set SPLIT_SIZE, and SPLIT_NUMBER will be ignored.
+SPLIT_SIZE=50m
 
-# Specify RemoteCopyCommand=[rcp|scp]
-RemoteCopyCommand=scp
-#RemoteCopyCommand=rcp
+# Specify RemoteCopyMethod=[rcp|scp]
+RemoteCopyMethod=scp
+#RemoteCopyMethod=rcp
 
 # PATH
 PATH=/bin:/usr/bin:$PATH

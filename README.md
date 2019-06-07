@@ -19,7 +19,7 @@ Following option has default value in config file, but can be overwritten by com
   
 Example:  
 quickRCP -f \<filename\> -c  \<remote login\>@\<remote hostname or IP\>:\<remote dir\>  
-quickRCP -f \<filename\> -h \<remote hostname or IP\> -u \<remote login\> -p \<remote dir\>  
+quickRCP -f \<filename\> -h \<remote hostname or IP\> -u \<remote login\> -d \<remote dir\>  
 
 
 Test environment:
