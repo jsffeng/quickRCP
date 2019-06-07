@@ -13,9 +13,7 @@
 #                                                                       #
 #########################################################################
 
-
 ############  Sub functions ############ 
-
 function usage
 {
 	if (( ${#} > 0 ))
@@ -60,13 +58,15 @@ function ResourceRelease
 	fi
 }
 
+# Before resource allocated, don't use 99 as exit code
 function EXIT
 {
-	if [[ ${1} != 0 ]]
+	if [[ ${1} == 99 ]]
 	then
 		ResourceRelease
 	fi
 
+	print
 	exit ${1}
 }
 
@@ -110,6 +110,7 @@ USAGE:  ${CMD_NAME} -f <file name> [-h <remote host>]
 		[-m <method>] [-t <time>] [-M <split mode>]
 		[-N <split number>] [-S <split size>]
 		[-T] [-H]
+
 Regular options:
 	-f 	file name for shipping,required option
 	-h	remote host name or IP
@@ -118,6 +119,7 @@ Regular options:
 	-c	if this option is used, option -h,-u,-d should not be used
 	-T	test mode, only used by tool adminstrator for quick debugging 
 	-H	print usage message
+
 Alternative options:
 	-m	shipping mothod, valid value is [rcp|scp]
 	-t	seconds for periodical checks for shipping completion
@@ -125,11 +127,11 @@ Alternative options:
 	-N	split number, when -s0 specify num, split input file with this number, example 10
 	-S	byte of split size, when -s0 specify size, split input file with this size, example 100m 
 
-NOTE: 	All alternative options have default value in config file, and can be used to 
-	overwrite the default value by command line. However, to update config file 
+Note: 	All alternative options have default value in Config file, and can be used to 
+	overwrite the default value by command line. However, to update Config file 
 	with new default value may be a simpler way to achieve the same.
 
-Example:
+Examples:
 	 ${CMD_NAME} -f file1.cpio -h 192.168.1.90 -u username -d /usr/tmp -m scp
 	 ${CMD_NAME} -f file1.cpio -c username@192.168.1.90:/usr/tmp
 "
@@ -156,18 +158,16 @@ fi
 
 if [[ -z $(echo ${0} |grep "/" 2>/dev/null) ]]
 then
-	ENV_SET=config
+	ENV_SET=Config
 	RCP_SCR=RCP
 else
 	CUR_TOOLDIR=$(dirname ${0} 2>/dev/null)
-        ENV_SET=${CUR_TOOLDIR}/config
+        ENV_SET=${CUR_TOOLDIR}/Config
 	RCP_SCR=${CUR_TOOLDIR}/RCP
 fi
 
 export PATH
 export RemoteCopyMethod
-# Set TESTMODE will be a quick way to test with shipping fake files with smaller size
-# This is efficient compared to debugging a problem with shipping a real large file
 export TESTMODE
 
 . ${ENV_SET}
@@ -204,6 +204,8 @@ do
 	S)	SPLIT_SIZE=${OPTARG}
 		;;
 	T)	TESTMODE=-T
+		# Will be a quicker way to test with shipping fake files in much smaller size
+		# This is to save debugging time by not shipping a real large file
 		;;
 	H)	usage
 		;;
@@ -221,11 +223,15 @@ then
 	usage unknown option: "$@"	
 fi
 
-# Perform validity checks.
+# Perform validity checks
 
 if [[ -z ${INPUTFILE} ]]
 then
 	usage "option '-f <file name>' always required!"
+elif [[ ! -f ${INPUTFILE} ]]
+then
+	LogMessage "ERROR: File ${INPUTFILE} doesn't exist!"
+	EXIT 1
 fi
 
 if (( opt_combine_num == 0 ))
@@ -243,9 +249,9 @@ then
 
 	if [[ -n $(echo ${REMOTE_ACCESS} | grep @ 2>/dev/null) && -n $(echo ${REMOTE_ACCESS} | grep : 2>/dev/null) ]]
 	then
-		REMOTE_SERVER=${REMOTE_ACCESS%%@*}
+		USER_ID=${REMOTE_ACCESS%%@*}
 		REST_REMOTE_ACCESS=${REMOTE_ACCESS##*@}
-		USER_ID=${REST_REMOTE_ACCESS%%:*}
+		REMOTE_SERVER=${REST_REMOTE_ACCESS%%:*}
 		DESTDIR=${REST_REMOTE_ACCESS##*:}
 	else
 		usage "bad -c argument!"
@@ -270,13 +276,13 @@ then
 	export RCP_CMD=rcp
 else
 	LogMessage "ERROR: RemoteCopyMethod cannot be any other value except scp or rcp!"
-	exit 1
+	EXIT 1
 fi
 
 if [[ -z ${TIMER} || ! -z ${TIMER//[0-9]} ]]
 then
 	LogMessage "ERROR: TIMER must be a natural number!"
-	exit 1
+	EXIT 1
 fi
 
 if [[ ${SPLIT_MODE} == "NUMBER" ]]
@@ -284,36 +290,35 @@ then
 	if [[ -z ${SPLIT_NUMBER} || ! -z ${SPLIT_NUMBER//[0-9]} ]]
 	then
 		LogMessage "ERROR: SPLIT_NUMBER must be a natural number!"
-		exit 1
+		EXIT 1
 	fi
-elif [[ ${SPLIT_MODE} != "SIZE" ]]
+elif [[ ${SPLIT_MODE} == "SIZE" ]]
 then
-	SIZE_SUFIX=${SPLIT_SIZE:0-1:0-1}
+	SIZE_SUFIX=${SPLIT_SIZE:0-1:1}
 	
-	if [[ SIZE_SUFIX =~ [0-9] ]]
+	if [[ ${SIZE_SUFIX} =~ [0-9] ]]
 	then
 		SIZE_VALUE=${SPLIT_SIZE}
-	elif [[ SIZE_SUFIX =~ [k,K,m,M] ]]
+	elif [[ ${SIZE_SUFIX} =~ [k,K,m,M] ]]
 	then
 		SIZE_VALUE=${SPLIT_SIZE%${SIZE_SUFIX}}
 	else
 		LogMessage "ERROR: Invalid SPLIT_SIZE, e.g. 100000000,100000k,100m!"
-		exit 1
+		EXIT 1
 	fi
 	
 	if [[ -z ${SIZE_VALUE} || ! -z ${SIZE_VALUE//[0-9]} ]]
 	then
 		LogMessage "ERROR: Invalid SPLIT_SIZE, e.g. 100000000,100000k,100m!"
-		exit 1
+		EXIT 1
 	fi
 else
 	LogMessage "ERROR: SPLIT_MODE cannot be any other value except NUMBER or SIZE!"
-	exit 1
+	EXIT 1
 fi
 
 ############  Preparation Module  ############ 
 LogMessage "${CMD_NAME} started in $(date)"
-print 
 
 export DEBUG=$HOME/${CMD_NAME}.debug
 
@@ -323,25 +328,20 @@ then
 	export TEMPRCP=${TEMP}/.rcp
 	export TEMPRCPDEBUG=${TEMP}/.rcpdebug
 else
-	LogMessage "ERROR: Directory ${TEMP_WORKDIR} doesn't exist! Please correct it in config file!"
-	exit 1
+	LogMessage "ERROR: Directory ${TEMP_WORKDIR} doesn't exist! Please correct it in Config file!"
+	EXIT 1
 fi
 
 DESTTEMP=${DESTDIR}/.ship$$.$(date +%m%d)
-ZIPFILE=$(basename ${INPUTFILE} 2>/dev/null) 
-ZIPDIR=$(dirname ${INPUTFILE} 2>/dev/null)
+FILENAME=$(basename ${INPUTFILE} 2>/dev/null) 
+FILEPATH=$(dirname ${INPUTFILE} 2>/dev/null)
 
-if [[ ! -f ${ZIPDIR}/${ZIPFILE} ]]
-then
-	LogMessage "ERROR: Can't find  ${ZIPFILE} under ${ZIPDIR}!"
-	exit 1
-else
- 	# "sum -r" output format is different between Linux and Solaris
-	# Just use the first field sum value and remove the rest
-	ORIG_SUM_T=$(sum -r  ${ZIPDIR}/${ZIPFILE} 2>/dev/null )
-	ORIG_SUM=${ORIG_SUM_T%% *}
-	DebugMessage "ORIG_SUM is ${ORIG_SUM}"
-fi
+# "sum -r" output format is different between Linux and Solaris
+# Just use the first field sum value and remove the rest
+ORIG_SUM_T=$(sum -r  ${FILEPATH}/${FILENAME} 2>/dev/null )
+ORIG_SUM=${ORIG_SUM_T%% *}
+
+DebugMessage "ORIG_SUM is ${ORIG_SUM}"
 
 if [[ ${RSH} == ssh ]]
 then
@@ -365,7 +365,7 @@ ${RSH} ${RSH_FLAGS} ${REMOTE_SERVER} -l ${USER_ID} date > /dev/null 2>&1
 if [[ $? != 0 ]]
 then
 	LogMessage "ERROR: Can't run \"${RSH} ${RSH_FLAGS} ${REMOTE_SERVER} -l ${USER_ID} date\" successfully! Please setup ${RSH} access with no passwd required!\n"
-	exit 1
+	EXIT 1
 fi
 
 mkdir -p ${TEMP} 
@@ -373,7 +373,7 @@ mkdir -p ${TEMP}
 if [[ ! -d ${TEMP} ]]
 then
 	LogMessage "ERROR: Can't create ${TEMP}!"
-	exit 1
+	EXIT 1
 fi
 
 # Verify if the remote directory is accessible or workable for scp or rcp.
@@ -383,7 +383,7 @@ ${RCP_CMD} ${TEMP}/.rcp_test ${USER_ID}@${REMOTE_SERVER}:${DESTDIR}/ > /dev/null
 if [[ $? != 0 ]]
 then
 	LogMessage "ERROR: Can't run \"${RCP_CMD} ${TEMP}/.rcp_test ${USER_ID}@${REMOTE_SERVER}:${DESTDIR}/\" successfully! Please verify if remote directory is ${DESTDIR}/ accessible!\n"
-	EXIT 1
+	EXIT 99
 else
 	${RSH} ${REMOTE_SERVER} -l ${USER_ID} rm -rf ${DESTDIR}/.rcp_test 2>/dev/null
 fi
@@ -397,50 +397,40 @@ ${RSH} ${REMOTE_SERVER} -l ${USER_ID} mkdir -p ${DESTTEMP} 2>/dev/null
 if [[ -z $(${RSH} ${REMOTE_SERVER} -l ${USER_ID} ls -d ${DESTTEMP} 2>/dev/null) ]]
 then
 	LogMessage "ERROR: Can't run ${RSH} successfully!"
-	EXIT 1
+	EXIT 99
 fi
 
 if [[ -z $TESTMODE ]]
 then
         if [[ ${SPLIT_MODE} == "SIZE" ]] 
 	then
-		if [[ -z ${SPLIT_SIZE} ]]
-		then
-			SPLIT_SIZE=100m
-		fi
-
-		split -b ${SPLIT_SIZE} ${ZIPDIR}/${ZIPFILE} ${TEMP}/${ZIPFILE}
+		split -b ${SPLIT_SIZE} ${FILEPATH}/${FILENAME} ${TEMP}/${FILENAME}
 	else
-		if [[ -z ${SPLIT_NUMBER} ]]
-		then
-			SPLIT_NUMBER=10
-		fi
-
-		split -n ${SPLIT_NUMBER} ${ZIPDIR}/${ZIPFILE} ${TEMP}/${ZIPFILE}
+		split -n ${SPLIT_NUMBER} ${FILEPATH}/${FILENAME} ${TEMP}/${FILENAME}
 	fi
 else
 	for x in a b c d
 	do
-		print "Test mode ${x}" > ${TEMP}/${ZIPFILE}${x}
+		print "Test mode ${x}" > ${TEMP}/${FILENAME}${x}
 	done
 fi
 
-# Split file numbers
+# Number for splitting files
 integer NUM
 
 cd $TEMP
-NAMELIST=$(ls ${ZIPFILE}* 2>/dev/null)
-NUM=$(ls ${ZIPFILE}* 2>/dev/null |wc -l)
+NAMELIST=$(ls ${FILENAME}* 2>/dev/null)
+NUM=$(ls ${FILENAME}* 2>/dev/null |wc -l)
 
 if (( NUM == 0 ))
 then
 	LogMessage "ERROR: split failed!"
-	EXIT 1
+	EXIT 99
 fi
 
 cd ${CUR_DIR}
 
-DebugMessage "${ZIPFILE} were splitted as ${NAMELIST}!"
+DebugMessage "${FILENAME} were splitted as ${NAMELIST}!"
 
 for i in ${NAMELIST}
 do
@@ -521,21 +511,21 @@ DebugMessage "Start Post process in $(date)"
 if (( success == NUM ))
 then
 # Merge remotely	
-	DebugMessage "Running: ${RSH} ${REMOTE_SERVER} -l ${USER_ID} \"cat ${DESTTEMP}/${ZIPFILE}* > ${DESTDIR}/${ZIPFILE} 2>/dev/null\""
-	${RSH} ${REMOTE_SERVER} -l ${USER_ID} "cat ${DESTTEMP}/${ZIPFILE}* > ${DESTDIR}/${ZIPFILE} 2>/dev/null"
+	DebugMessage "Running: ${RSH} ${REMOTE_SERVER} -l ${USER_ID} \"cat ${DESTTEMP}/${FILENAME}* > ${DESTDIR}/${FILENAME} 2>/dev/null\""
+	${RSH} ${REMOTE_SERVER} -l ${USER_ID} "cat ${DESTTEMP}/${FILENAME}* > ${DESTDIR}/${FILENAME} 2>/dev/null"
 	
 elif (( fail == MAX_FAILURE ))
 then
 	ErrorHandle 1 
-	exit 1
+	EXIT 1
 elif (( fatal != 0 ))
 then
 	ErrorHandle 2
-	exit 1
+	EXIT 1
 
 else
 	ErrorHandle 3 
-	exit 1
+	EXIT 1
 fi
 
 # Sum Checking
@@ -543,15 +533,15 @@ if [[ -z $TESTMODE ]]
 then
  	# "sum -r" output format is different between Linux and Solaris
 	# Just use the first field sum value and remove the rest
-	NEW_SUM_T=$(${RSH} ${REMOTE_SERVER} -l ${USER_ID} sum -r ${DESTDIR}/${ZIPFILE}  2>/dev/null)
+	NEW_SUM_T=$(${RSH} ${REMOTE_SERVER} -l ${USER_ID} sum -r ${DESTDIR}/${FILENAME}  2>/dev/null)
 	NEW_SUM=${NEW_SUM_T%% *}
 	DebugMessage "NEW_SUM is ${NEW_SUM}"
 	if [[ ${ORIG_SUM} == ${NEW_SUM} ]]
 	then
-		LogMessage "${ZIPFILE} was successfully shipped!"
+		LogMessage "${FILENAME} was successfully shipped!"
 	else
-		LogMessage "ERROR: Sum value of ${ZIPFILE} didn't match, Please investigate!"
-		EXIT 1
+		LogMessage "ERROR: Sum value of ${FILENAME} didn't match, Please investigate!"
+		EXIT 99
 	fi
 else
 	DebugMessage "Test mode skip sum checking"
@@ -563,4 +553,4 @@ ResourceRelease 0
 
 LogMessage "${CMD_NAME} completed in $(date)"
 
-exit 0
+EXIT 0
