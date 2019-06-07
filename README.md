@@ -33,9 +33,10 @@ Examples:
   
 Development Environment:  
 ----------------------  
-- Initial version developed on Solaris 10 server, support rsh/rcp and basic sun day scenarios, but not support:  
+- Initial version developed on Solaris 10 server, support rsh/rcp and basic sun day scenarios,  
+but the followings were not supported:  
 	- ssh/scp,rainy day handling, Config file and related options, command line interface, etc.  
-- Full version developed on Linux ubuntu 16.04.01.  
+- Full version completed on Linux ubuntu 16.04.01.  
   
 Dependent packages/tools:
 ----------------------  
