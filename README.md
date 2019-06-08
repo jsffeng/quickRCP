@@ -60,7 +60,7 @@ some new syntax has to be replaced with old style syntax, for example:
 Dependent packages/tools:
 ----------------------  
 - Korn Shell - /bin/ksh  
-- rsh or ssh  
+- rsh or ssh (need to config remote access w/o password, please reference Internet material for detailed setup)  
 - awk
 - tools - split, sum, pstree
   
