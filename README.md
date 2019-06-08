@@ -1,10 +1,10 @@
 Tool Usage:  
 ------------  
-USAGE:  quickRCP -f \\>file name\> [-h \\>remote host\>]  
-		[-u \\>remote login\>] [-d \\>remote dir\>]  
-		[-c \\>remote login\>@\\>remote host\>:\\>remote dir\>]  
-		[-m \\>method\>] [-t \\>time\>] [-M \\>split mode\>]  
-		[-N \\>split number\>] [-S \\>split size\>]  
+USAGE:  quickRCP -f \<file name\> [-h \<remote host\>]  
+		[-u \<remote login\>] [-d \<remote dir\>]  
+		[-c \<remote login\>@\<remote host\>:\<remote dir\>]  
+		[-m \<method\>] [-t \<time\>] [-M \<split mode\>]  
+		[-N \<split number\>] [-S \<split size\>]  
 		[-T] [-H]  
   
 Regular options:  
