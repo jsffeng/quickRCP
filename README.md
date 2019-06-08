@@ -51,7 +51,11 @@ Development Environment:
 - Initial version developed on Solaris 10 server, support rsh/rcp and basic sun day scenarios,  
 but the followings were not supported:  
 	- ssh/scp,rainy day handling, Config file and related options, command line interface, etc.  
-- Full version completed on Linux ubuntu 16.04.01.  
+- Full version completed on Linux ubuntu 16.04.01, then tested on Solaris 8 server.To ensure compatible   
+some new syntax has to be replaced with old style syntax, for example:  
+	- let variable++ ===> let variable=variable+1  
+	- ${variable//[0-9]}  ==> echo ${variable} |sed "s/[0-9]//g"   
+	- ${varible:0-1:1} ==> echo ${variable} |sed "s/\(.*\)\(.\)$/\2/"  
   
 Dependent packages/tools:
 ----------------------  
