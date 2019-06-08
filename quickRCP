@@ -55,6 +55,8 @@ function ResourceRelease
 	else
 		# Do nothing but remove DEBUG flag file
 		rm -f $DEBUG
+		print "\nINFO:${TEMP} and ${DESTTEMP} on ${REMOTE_SERVER} are kept for debugging purpose."
+		print "Please ensure to manually remove them after debugging."
 	fi
 }
 
