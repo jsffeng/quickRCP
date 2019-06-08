@@ -5,7 +5,8 @@ TEMP_WORKDIR=/tmp
 TIMER=5
 
 # Specify SPLIT_MODE=[NUMBER|SIZE]
-SPLIT_MODE=NUMBER
+# On Linux, both NUMBER and SIZE supported. On Solaris only SIZE supported.
+SPLIT_MODE=SIZE
 
 # If SPLIT_MODE=NUMBER, must set SPLIT_NUMBER, and SPLIT_SIZE will be ignored.
 SPLIT_NUMBER=10
