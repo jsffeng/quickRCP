@@ -67,7 +67,7 @@ Dependent packages/tools:
 Test environment:  
 -------------------  
 - From Linux (ubuntu) server to Linux (ubuntu) server    
-- From Solaris(SunOS 5.8) server to Solaris 10 server
+- From Solaris 8 server to Solaris 10 server
 
    
 Bugfix Backlog:  
