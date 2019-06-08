@@ -1,4 +1,4 @@
-#!/bin/ksh93
+#!/bin/ksh
 
 function DebugMessage
 {
@@ -47,6 +47,7 @@ then
 	RCP_CMD=rcp
 fi
 
+sleep 60
 ${RCP_CMD} "${@:-}"
 RET=$?
 DebugMessage "Return value is $RET"
