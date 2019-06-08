@@ -1,4 +1,4 @@
-#!/bin/ksh93
+#!/bin/ksh
 
 #########################################################################
 # Descriptions: If you experienced several hours or even longer to ship #
@@ -40,9 +40,22 @@ function DebugMessage
 # Set $1 as 0 for normal completion, otherwise for abormal completion
 function ResourceRelease 
 {
-	if [[ ${1} != 0 ]]
+	if [[ $__SOLARIS__ == "YES" ]]
 	then
-		ps --ppid $$| awk '{if($1~/[0-9]+/) print $1}'| xargs kill -9 >/dev/null 2<&1
+		if ((trap_count != 0))
+		then
+			exit 1
+		fi
+	fi
+
+	
+	if [[ $__LINUX__ == "YES" ]]
+	then
+		if [[ ${1} != 0 ]]
+		then
+			#ps --ppid $$| awk '{if($1~/[0-9]+/) print $1}'| xargs kill -9 >/dev/null 2>&1
+			pstree $$ -p  | tr "(" "\n" |tr ")" "\n" | awk '{if ($1~/[0-9]+/) print $1}' |xargs kill -9  >/dev/null 2>&1
+		fi
 	fi
 
 	if [[ ! -f ${DEBUG} ]]
@@ -57,6 +70,11 @@ function ResourceRelease
 		rm -f $DEBUG
 		print "\nINFO:${TEMP} and ${DESTTEMP} on ${REMOTE_SERVER} are kept for debugging purpose."
 		print "Please ensure to manually remove them after debugging."
+	fi
+
+	if [[ $__SOLARIS__ == "YES" ]]
+	then
+		let trap_count=trap_count+1
 	fi
 }
 
@@ -102,6 +120,21 @@ function ErrorHandle
 	ResourceRelease
 }
 
+############  Verify you are on Linux or Solaris  ############ 
+MACHINE=$(uname -a)
+export __LINUX__=NO
+export __SOLARIS__=NO
+if [[ -n $(echo ${MACHINE}|grep -i Linux 2>/dev/null) ]]
+then
+	__LINUX__=YES
+elif [[ -n $(echo ${MACHINE}|grep -i SunOS 2>/dev/null) ]]
+then
+	__SOLARIS__=YES
+else
+	print "ERROR:You are running it neither on Linux nor Solaris machine, please test it and modify the tool before using!"
+	exit 1
+fi
+
 ############  Command Interface Module  ############ 
 export CMD_NAME=${0##*/}
 
@@ -125,9 +158,9 @@ Regular options:
 Alternative options:
 	-m	shipping mothod, valid value is [rcp|scp]
 	-t	seconds for periodical checks for shipping completion
-	-M	split mode, valid value is [NUMBER|SIZE]
-	-N	split number, when -s0 specify num, split input file with this number, example 10
-	-S	byte of split size, when -s0 specify size, split input file with this size, example 100m 
+	-M	split mode, valid value is [NUMBER|SIZE] on Linux. On Solaris, only SIZE supported
+	-N	split number, when -M specify NUMBER, split input file with this number, example 10
+	-S	byte of split size, when -M specify SIZE, split input file with this size, example 100m 
 
 Note: 	All alternative options have default value in Config file, and can be used to 
 	overwrite the default value by command line. However, to update Config file 
@@ -184,16 +217,16 @@ do
 	f)	INPUTFILE=${OPTARG}
 		;;
 	h)	REMOTE_SERVER=${OPTARG}
-		let opt_num++
+		let opt_num=opt_num+1
 		;;
 	u)	USER_ID=${OPTARG}
-		let opt_num++
+		let opt_num=opt_num+1
 		;;
 	d)	DESTDIR=${OPTARG}
-		let opt_num++
+		let opt_num=opt_num+1
 		;;
 	c)	REMOTE_ACCESS=${OPTARG}
-		let opt_combine_num++
+		let opt_combine_num=opt_combine_num+1
 		;;
 	m)	RemoteCopyMethod=${OPTARG}
 		;;
@@ -281,7 +314,7 @@ else
 	EXIT 1
 fi
 
-if [[ -z ${TIMER} || ! -z ${TIMER//[0-9]} ]]
+if [[ -z ${TIMER} || ! -z $(echo ${TIMER}|sed "s/[0-9]//g" 2>/dev/null) ]]
 then
 	LogMessage "ERROR: TIMER must be a natural number!"
 	EXIT 1
@@ -289,19 +322,25 @@ fi
 
 if [[ ${SPLIT_MODE} == "NUMBER" ]]
 then
-	if [[ -z ${SPLIT_NUMBER} || ! -z ${SPLIT_NUMBER//[0-9]} ]]
+	if [[ $__SOLARIS__ == "YES" ]]
+	then
+		LogMessage "ERROR: SPLIT_MODE cannot be NUMBER in Solaris!"
+		EXIT 1
+	fi
+
+	if [[ -z ${SPLIT_NUMBER} || ! -z $(echo ${SPLIT_NUMBER}|sed "s/[0-9]//g" 2>/dev/null) ]]
 	then
 		LogMessage "ERROR: SPLIT_NUMBER must be a natural number!"
 		EXIT 1
 	fi
 elif [[ ${SPLIT_MODE} == "SIZE" ]]
 then
-	SIZE_SUFIX=${SPLIT_SIZE:0-1:1}
+	SIZE_SUFIX=$(echo ${SPLIT_SIZE} |sed "s/\(.*\)\(.\)$/\2/" 2>/dev/null)
 	
-	if [[ ${SIZE_SUFIX} =~ [0-9] ]]
+	if [[ -n $(echo ${SIZE_SUFIX}|grep [0-9] 2>/dev/null) ]]
 	then
 		SIZE_VALUE=${SPLIT_SIZE}
-	elif [[ ${SIZE_SUFIX} =~ [k,K,m,M] ]]
+	elif [[ -n $(echo ${SIZE_SUFIX} |grep [k,m] 2>/dev/null) ]]
 	then
 		SIZE_VALUE=${SPLIT_SIZE%${SIZE_SUFIX}}
 	else
@@ -309,7 +348,7 @@ then
 		EXIT 1
 	fi
 	
-	if [[ -z ${SIZE_VALUE} || ! -z ${SIZE_VALUE//[0-9]} ]]
+	if [[ -z ${SIZE_VALUE} || ! -z $(echo ${SIZE_VALUE}|sed "s/[0-9]//g" 2>/dev/null) ]]
 	then
 		LogMessage "ERROR: Invalid SPLIT_SIZE, e.g. 100000000,100000k,100m!"
 		EXIT 1
@@ -352,7 +391,15 @@ else
 	RSH_FLAGS=
 fi
 
-trap "ResourceRelease;kill 0;exit 1" 1 2 3 15
+if [[ $__SOLARIS__ == "YES" ]]
+then
+	integer trap_count=0
+fi
+
+# On Solaris, kill 0 can terminate all children processes, but it will cause trap fall into infinite 
+# loop, so quit from ResourceRelease if it was called the second time.
+# On Linux, looks kill 0 will do nothing, just rely on ResourceRelease to kill all children processess.
+trap "ResourceRelease;kill 0;exit 1" 1 2 3 15 
 
 if [[ ! -z ${TESTMODE} ]]
 then
@@ -464,33 +511,33 @@ do
 		ReadStat ${TEMPRCP}/$i
 		case ${RCPSTAT} in
 		    NS) 
-			let notstart++
+			let notstart=notstart+1
 			DebugMessage "Background running ${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
-			${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
+			${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} >/dev/null 2>&1 &
 		     	;;	
 		    IP)
 			if [[ -d /proc/${RCP_PID} ]]
 			then
 				# Process is alive
-				let inprog++
+				let inprog=inprog+1
 			else
 				# Process has died
-				let fail++
+				let fail=fail+1
 				DebugMessage "Background running ${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
-				${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
+				${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} >/dev/null 2>&1 &
 			fi
 			;;	
 		    FAIL)
-			let fail++
+			let fail=fail+1
 			DebugMessage "Background running ${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP}, go to ${TEMPRCPDEBUG} for more details"
-			${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} &
+			${RCP_SCR} ${TEMP}/${i} ${USER_ID}@${REMOTE_SERVER}:${DESTTEMP} >/dev/null 2>&1 &
 			;;	
         	    CO)
-			let success++
+			let success=success+1
 			;;	
 		    *)	
 			DebugMessage "ERROR: Abnormal RCPSTAT=${RCPSTAT}!"
-			let fatal++
+			let fatal=fatal+1
 			;;	
 		esac
 	done
@@ -513,9 +560,8 @@ DebugMessage "Start Post process in $(date)"
 if (( success == NUM ))
 then
 # Merge remotely	
-	DebugMessage "Running: ${RSH} ${REMOTE_SERVER} -l ${USER_ID} \"cat ${DESTTEMP}/${FILENAME}* > ${DESTDIR}/${FILENAME} 2>/dev/null\""
-	${RSH} ${REMOTE_SERVER} -l ${USER_ID} "cat ${DESTTEMP}/${FILENAME}* > ${DESTDIR}/${FILENAME} 2>/dev/null"
-	
+	DebugMessage "Running: ${RSH} ${REMOTE_SERVER} -l ${USER_ID} \"cat ${DESTTEMP}/${FILENAME}* > ${DESTDIR}/${FILENAME}\" 2>/dev/null"
+	${RSH} ${REMOTE_SERVER} -l ${USER_ID} "cat ${DESTTEMP}/${FILENAME}* > ${DESTDIR}/${FILENAME}" 2>/dev/null
 elif (( fail == MAX_FAILURE ))
 then
 	ErrorHandle 1 
