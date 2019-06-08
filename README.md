@@ -34,15 +34,15 @@ Examples:
 How it works:  
 ----------------------  
 - The idea is quite simple - split the large file into small pieces and ship them in multiple rcp or   
->> scp processess, then merge them into the final file at the destination once all shippings complete.  
+scp processess, then merge them into the final file at the destination once all shippings complete.  
 - Why choosing script rather than programming languages supporting multi-processes or multi-threads?  
 	- Based on the basic idea, the nature of this tool is just to automate the unix/linux command  
->>>>> rcp/scp in the user's own environment, and script is suitable to achieve this. The challenging part may   
->>>>> be to track the status of each process. State machine files (NS -Not Start, IP - In Progress, CO -   
->>>>> Completed) used to help this. Also /proc/<process id> is used to ensure the process is still alive,  
->>>>> and not dying without updating State machine files. Of course, neccesary environment checks, temprary   
->>>>> directories' cleanup and sub-processes clean up also need to be taken care of by the tool whenever any   
->>>>> abormal aborting happens.  
+rcp/scp in the user's own environment, and script is suitable to achieve this. The challenging part may   
+be to track the status of each process. State machine files (NS -Not Start, IP - In Progress, CO -   
+Completed) used to help this. Also /proc/<process id> is used to ensure the process is still alive,  
+and not dying without updating State machine files. Of course, neccesary environment checks, temprary   
+directories' cleanup and sub-processes clean up also need to be taken care of by the tool whenever any   
+abormal aborting happens.  
 	- Use script is easy for users to debug their own environment issues causing any failure.  
 	- Also using script could more portable for any server which supports Linux/Unix shell.  
     
