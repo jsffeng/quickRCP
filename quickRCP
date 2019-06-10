@@ -48,16 +48,6 @@ function ResourceRelease
 		fi
 	fi
 
-	
-	if [[ $__LINUX__ == "YES" ]]
-	then
-		if [[ ${1} != 0 ]]
-		then
-			#ps --ppid $$| awk '{if($1~/[0-9]+/) print $1}'| xargs kill -9 >/dev/null 2>&1
-			pstree $$ -p  | tr "(" "\n" |tr ")" "\n" | awk '{if ($1~/[0-9]+/) print $1}' |xargs kill -9  >/dev/null 2>&1
-		fi
-	fi
-
 	if [[ ! -f ${DEBUG} ]]
 	then
 		# Release resource, in case ssh requiring password use RSH_FLAGS here
@@ -70,6 +60,17 @@ function ResourceRelease
 		rm -f $DEBUG
 		print "\nINFO:${TEMP} and ${DESTTEMP} on ${REMOTE_SERVER} are kept for debugging purpose."
 		print "Please ensure to manually remove them after debugging."
+	fi
+
+	rm -rf ${LOCKFILE}
+
+	# In the test on ubuntu, found following code will cause the whole process terminate, so move it to be the last command to execute. 
+	if [[ $__LINUX__ == "YES" ]]
+	then
+		if [[ ${1} != 0 ]]
+		then
+			pstree ${PID} -p  | tr "(" "\n" |tr ")" "\n" | awk '{if ($1~/[0-9]+/) print $1}' |grep -v -x1 ${PID}| xargs kill -9  >/dev/null 2>&1
+		fi
 	fi
 
 	if [[ $__SOLARIS__ == "YES" ]]
@@ -120,7 +121,7 @@ function ErrorHandle
 	ResourceRelease
 }
 
-############  Verify you are on Linux or Solaris  ############ 
+############  Verify if you are on Linux or Solaris  ############ 
 MACHINE=$(uname -a)
 export __LINUX__=NO
 export __SOLARIS__=NO
@@ -137,6 +138,20 @@ fi
 
 ############  Command Interface Module  ############ 
 export CMD_NAME=${0##*/}
+
+# Ensure only 1 instance is running for each login
+LOCKFILE=$HOME/.${CMD_NAME}_lock++
+
+PID=$$
+if [[ ! -f ${LOCKFILE} ]]
+then
+	echo "${PID}">${LOCKFILE}
+else
+	PRE_PID=$(cat ${LOCKFILE} 2>/dev/null)
+	print "ERROR:There is an instance running with pid=${PRE_PID} with this login! If the process has died, please manually remove ${LOCKFILE} and retry it!"
+	exit 1
+	
+fi
 
 USAGE="
 USAGE:  ${CMD_NAME} -f <file name> [-h <remote host>]
@@ -379,7 +394,7 @@ export DEBUG=$HOME/${CMD_NAME}.debug
 
 if [[ -d ${TEMP_WORKDIR} ]]
 then
-	export TEMP=${TEMP_WORKDIR}/split$$.$(date +%m%d)
+	export TEMP=${TEMP_WORKDIR}/split${PID}.$(date +%m%d)
 	export TEMPRCP=${TEMP}/.rcp
 	export TEMPRCPDEBUG=${TEMP}/.rcpdebug
 else
@@ -387,7 +402,7 @@ else
 	EXIT 1
 fi
 
-DESTTEMP=${DESTDIR}/.ship$$.$(date +%m%d)
+DESTTEMP=${DESTDIR}/.ship${PID}.$(date +%m%d)
 FILENAME=$(basename ${INPUTFILE} 2>/dev/null) 
 FILEPATH=$(dirname ${INPUTFILE} 2>/dev/null)
 
@@ -415,7 +430,7 @@ fi
 
 # On Solaris, kill 0 can terminate all children processes, but it will cause trap fall into infinite 
 # loop, so quit from ResourceRelease if it was called the second time.
-# On Linux, looks kill 0 will do nothing, just rely on ResourceRelease to kill all children processess.
+# On ubuntu, once running ResourceRelease to kill all children processess, the whole process died accordingly.
 trap "ResourceRelease;kill 0;exit 1" 1 2 3 15 
 
 if [[ ! -z ${TESTMODE} ]]
