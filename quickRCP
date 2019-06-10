@@ -86,6 +86,8 @@ function EXIT
 		ResourceRelease
 	fi
 
+	[ -f $LOCKFILE ] && rm -rf ${LOCKFILE}
+	[ -f $DEBUG ] && rm -f $DEBUG
 	print
 	exit ${1}
 }
@@ -131,7 +133,7 @@ elif [[ -n $(echo ${MACHINE}|grep -i SunOS 2>/dev/null) ]]
 then
 	__SOLARIS__=YES
 else
-	print "ERROR:You are running it neither on Linux nor Solaris machine, please test it and modify the tool before using!"
+	print "ERROR:You are running it neither on Linux nor Solaris machine, please test it and modify the tool before using\n!"
 	exit 1
 fi
 
@@ -141,15 +143,17 @@ export CMD_NAME=${0##*/}
 # Ensure only 1 instance is running for each login
 LOCKFILE=$HOME/.${CMD_NAME}_lock++
 
+# Set DEBUG at the beginning as EXIT need to read this variable.
+export DEBUG=$HOME/${CMD_NAME}.debug
+
 PID=$$
 if [[ ! -f ${LOCKFILE} ]]
 then
 	echo "${PID}">${LOCKFILE}
 else
 	PRE_PID=$(cat ${LOCKFILE} 2>/dev/null)
-	print "ERROR:There is an instance running with pid=${PRE_PID} with this login! If the process has died, please manually remove ${LOCKFILE} and retry it!"
+	print "ERROR:There is an instance running with pid=${PRE_PID} with this login! If the process has died, please manually remove ${LOCKFILE} and retry it!\n"
 	exit 1
-	
 fi
 
 USAGE="
@@ -389,7 +393,6 @@ fi
 ############  Preparation Module  ############ 
 LogMessage "${CMD_NAME} started in $(date)"
 
-export DEBUG=$HOME/${CMD_NAME}.debug
 
 if [[ -d ${TEMP_WORKDIR} ]]
 then
@@ -525,7 +528,7 @@ integer notstart
 integer inprog
 integer fail=0
 integer fatal=0
-integer MAX_FAILURE=3
+integer MAX_FAILURE=10
 RCPSTAT=
 RCP_PID=AAAAA
 
@@ -595,15 +598,15 @@ then
 	${RSH} ${REMOTE_SERVER} -l ${USER_ID} "cat ${DESTTEMP}/${FILENAME}* > ${DESTDIR}/${FILENAME}" 2>/dev/null
 elif (( fail == MAX_FAILURE ))
 then
-	ErrorHandle 1 
-	EXIT 1
+	ErrorHandle 1
+	EXIT 1 
 elif (( fatal != 0 ))
 then
 	ErrorHandle 2
 	EXIT 1
 
 else
-	ErrorHandle 3 
+	ErrorHandle 3
 	EXIT 1
 fi
 
