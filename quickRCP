@@ -326,6 +326,14 @@ then
 	EXIT 1
 fi
 
+integer timer=${TIMER}
+
+if (( timer < 2 ))
+then
+	LogMessage "ERROR: TIMER must be a natural number greater than or equal to 2 seconds!"
+	EXIT 1
+fi
+
 if [[ ${SPLIT_MODE} == "NUMBER" ]]
 then
 	if [[ $__SOLARIS__ == "YES" ]]
