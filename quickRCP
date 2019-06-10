@@ -169,16 +169,16 @@ USAGE:  ${CMD_NAME} -f <file name> [-h <remote host>]
 		[-T] [-H]
 
 Regular options:
-	-f 	file name for shipping,required option
+	-f 	file name for shipping, required option
 	-h	remote host name or IP
 	-u	remote login
 	-d	remote directory
 	-c	if this option is used, option -h,-u,-d should not be used
-	-T	test mode, only used by tool adminstrator for quick debugging 
+	-T	test mode, only used by tool administrator for quick debugging 
 	-H	print usage message
 
 Alternative options:
-	-m	shipping mothod, valid value is [rcp|scp]
+	-m	shipping method, valid value is [rcp|scp]
 	-t	seconds for periodical checks for shipping completion
 	-M	split mode, valid value is [NUMBER|SIZE] on Linux. On Solaris, only SIZE supported
 	-N	split number, when -M specify NUMBER, split input file with this number, example 10
