@@ -37,8 +37,8 @@ How it works:
 rcp/scp processess, and finally merge them into one file in the destination once all shippings complete.  
 - Why choosing script rather than programming languages supporting multi-processes or multi-threads better?  
 	- Based on the basic idea, the nature of this tool is just to automate the unix/linux command  
-rcp/scp in the user's own environment, and scripting is suitable such purpose. With this, to take care of      
-well tracking the status of each process, simple state machine files (i.e. NS-Not Start, IP-In Progress,   
+rcp/scp in the user's own environment, and scripting is suitable for such purpose. With this, to take care        
+of tracking the status of each process, simple state machine files (i.e. NS-Not Start, IP-In Progress,   
 CO-Completed) have been introduced, and also /proc/<process id> is used to very if the process is alive,i.e.    
 not dying without telling State machine files. Of course, neccesary environment checks, temporary   
 directories' cleanup and child processes' cleanup also need to be taken care of by the tool in case that any   
