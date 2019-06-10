@@ -4,6 +4,9 @@ TEMP_WORKDIR=/tmp
 # Seconds for periodical checks on if shipping completed.
 TIMER=5
 
+# Seconds for SSH/RSH connection timeout.
+CONNECT_TIMEOUT=30
+
 # Specify SPLIT_MODE=[NUMBER|SIZE]
 # On Linux, both NUMBER and SIZE supported. On Solaris only SIZE supported.
 SPLIT_MODE=SIZE

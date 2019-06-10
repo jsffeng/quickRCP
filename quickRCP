@@ -207,6 +207,12 @@ export TESTMODE
 
 . ${ENV_SET}
 
+if [[ -z ${CONNECT_TIMEOUT} || ! -z $(echo ${CONNECT_TIMEOUT}|sed "s/[0-9]//g" 2>/dev/null) ]]
+then
+	LogMessage "ERROR: Illegal value for CONNECT_TIMEOUT in Config file!"
+	EXIT 1
+fi
+
 OPT_PASS=YES
 integer opt_num=0
 integer opt_combine_num=0
@@ -386,8 +392,11 @@ DebugMessage "ORIG_SUM is ${ORIG_SUM}"
 
 if [[ ${RSH} == ssh ]]
 then
-	RSH_FLAGS="-o PreferredAuthentications=publickey -o StrictHostKeyChecking=no"
+	RSH_FLAGS="-o PreferredAuthentications=publickey -o StrictHostKeyChecking=no -o ConnectTimeout=${CONNECT_TIMEOUT}"
 else
+	# For rsh, freeBSD version support -t timeout option, 
+	# while on solaris, no timeout option is supported. 
+	# So just leave it empty to ensure compatible.
 	RSH_FLAGS=
 fi
 
