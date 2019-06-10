@@ -48,6 +48,14 @@ function ResourceRelease
 		fi
 	fi
 
+	if [[ $__LINUX__ == "YES" ]]
+	then
+		if [[ ${1} != 0 ]]
+		then
+			pstree ${PID} -p  | tr "(" "\n" |tr ")" "\n" | awk -v pid=${PID} '{if ($1~/[0-9]+/ && $1 != pid) print $1}'|xargs kill -9
+		fi
+	fi
+
 	if [[ ! -f ${DEBUG} ]]
 	then
 		# Release resource, in case ssh requiring password use RSH_FLAGS here
@@ -63,15 +71,6 @@ function ResourceRelease
 	fi
 
 	rm -rf ${LOCKFILE}
-
-	# In the test on ubuntu, found following code will cause the whole process terminate, so move it to be the last command to execute. 
-	if [[ $__LINUX__ == "YES" ]]
-	then
-		if [[ ${1} != 0 ]]
-		then
-			pstree ${PID} -p  | tr "(" "\n" |tr ")" "\n" | awk '{if ($1~/[0-9]+/) print $1}' |grep -v -x1 ${PID}| xargs kill -9  >/dev/null 2>&1
-		fi
-	fi
 
 	if [[ $__SOLARIS__ == "YES" ]]
 	then
@@ -430,7 +429,7 @@ fi
 
 # On Solaris, kill 0 can terminate all children processes, but it will cause trap fall into infinite 
 # loop, so quit from ResourceRelease if it was called the second time.
-# On ubuntu, once running ResourceRelease to kill all children processess, the whole process died accordingly.
+# On Linux, looks kill 0 will do nothing, just rely on ResourceRelease to kill all children processess.
 trap "ResourceRelease;kill 0;exit 1" 1 2 3 15 
 
 if [[ ! -z ${TESTMODE} ]]
