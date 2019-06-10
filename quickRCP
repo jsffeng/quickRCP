@@ -52,7 +52,7 @@ function ResourceRelease
 	then
 		if [[ ${1} != 0 ]]
 		then
-			pstree ${PID} -p  | tr "(" "\n" |tr ")" "\n" | awk -v pid=${PID} '{if ($1~/[0-9]+/ && $1 != pid) print $1}'|xargs kill -9
+			pstree ${PID} -p  | tr "(" "\n" |tr ")" "\n" | awk -v pid=${PID} '{if ($1~/[0-9]+/ && $1 != pid) print $1}'|xargs kill -9 >/dev/null 2>&1
 		fi
 	fi
 
