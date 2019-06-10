@@ -21,6 +21,10 @@ function usage
 		print -u2 "Error: ${CMD_NAME}: ${@}"
 	fi
 	print "${USAGE}"
+
+	[ -f $LOCKFILE ] && rm -rf ${LOCKFILE}
+	[ -f $DEBUG ] && rm -f $DEBUG
+
 	exit ${#}
 }
 
