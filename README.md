@@ -77,4 +77,6 @@ the tool hanging unexpetedly.
 	- Status: Enhanced but no perfect fix yet. To support ConnectTimeout option has been done to ssh,  
 however, for rsh, not all versions supporting timeout option, e.g. FreeBSD support "-t timeout" for rsh,  
 but looks Solaris and ubuntu never support that.   
-- Reporting a message like "Deleting the temporary files before quiting ..." for ctrl+c, otherwise, people may just think ctrl+c is not responding as it could take sometime to do some cleanup.
+- Reporting a message like "Deleting the temporary files before quiting ..." for ctrl+c, otherwise, people  
+may just think ctrl+c is not responding as it could take some time to complete the cleaning-up.  
+
