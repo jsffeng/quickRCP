@@ -41,7 +41,7 @@ function DebugMessage
 	fi
 }
 
-# Set $1 as 0 for normal completion, otherwise for abormal completion
+# Set $1 as 0 for normal completion, otherwise for abnormal completion
 function ResourceRelease 
 {
 	if [[ $__SOLARIS__ == "YES" ]]
@@ -424,8 +424,8 @@ then
 	RSH_FLAGS="-o PreferredAuthentications=publickey -o StrictHostKeyChecking=no -o ConnectTimeout=${CONNECT_TIMEOUT}"
 else
 	# For rsh, freeBSD version support -t timeout option, 
-	# while on solaris, no timeout option is supported. 
-	# So just leave it empty to ensure compatible.
+	# while on Solaris, no timeout option is supported. 
+	# So just leave it empty to ensure the compatiblity.
 	RSH_FLAGS=
 fi
 
@@ -436,7 +436,7 @@ fi
 
 # On Solaris, kill 0 can terminate all children processes, but it will cause trap fall into infinite 
 # loop, so quit from ResourceRelease if it was called the second time.
-# On Linux, looks kill 0 will do nothing, just rely on ResourceRelease to kill all children processess.
+# On Linux, looks kill 0 will do nothing, just rely on ResourceRelease to kill all children processes.
 trap "ResourceRelease;kill 0;exit 1" 1 2 3 15 
 
 if [[ ! -z ${TESTMODE} ]]
