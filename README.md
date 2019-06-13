@@ -78,6 +78,7 @@ the tool hanging unexpectedly.
 however, for rsh, not all versions supporting timeout option, e.g. FreeBSD support "-t timeout" for rsh,  
 but looks Solaris and ubuntu never support that.   
 - Reporting a message like "Deleting the temporary files before quitting ..." for ctrl+c, otherwise, people  
+may just think ctrl+c is not responding when the tool is doing some cleanup before quitting.   
 - So far, it requires double space in the destination side, e.g. to ship a file in 1G bytes, need at least 2G   
 disk space in the remote side. The reason lies in the fact that the temporary file pieces will also need to   
 take space, and the temporary files won't be deleted until the final file generation completes. This part  
