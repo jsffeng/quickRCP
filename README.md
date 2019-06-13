@@ -34,25 +34,25 @@ Examples:
 How it works:  
 ----------------------  
 - The idea is quite simple: to split the large file into small pieces and ship them by multiple background 
-rcp/scp processess, and finally merge them into one file in the destination once all shippings complete.  
+rcp/scp processes, and finally merge them into one file in the destination once all shipping complete.  
 - Why choosing script rather than programming languages supporting multi-processes or multi-threads better?  
 	- Based on the basic idea, the nature of this tool is just to automate the unix/linux command  
 rcp/scp in the user's own environment, and scripting is suitable for such purpose. With this, to take care        
 of tracking the status of each process, simple state machine files (i.e. NS-Not Start, IP-In Progress,   
-CO-Completed) have been introduced, and also /proc/<process id> is used to very if the process is alive,i.e.    
-not dying without telling State machine files. Of course, neccesary environment checks, temporary   
+CO-Completed) have been introduced, and also /proc/<process id> is used to very if the process is alive, i.e.    
+not dying without telling State machine files. Of course, necessary environment checks, temporary   
 directories' cleanup and child processes' cleanup also need to be taken care of by the tool in case that any   
 unexpected aborting happens.  
 	- Script could be easier for users to debug their own environment issues related to any failures.  
-	- Also script could be more convient for being ported to any server which supports Linux/Unix shell.  
+	- Also script could be more convenient for being ported to any server which supports Linux/Unix shell.  
     
 Development Environment:  
 ----------------------  
 - Initial version developed on Solaris 10 server, with supporting rsh/rcp and basic sun day scenarios,  
 but the followings were not covered:  
-	- ssh/scp,rainy day handling, Config file and more options, command line interface, etc.  
+	- ssh/scp, rainy day handling, Config file and more options, command line interface, etc.  
 - Full version completed and tested on Linux ubuntu 16.04.01, then tested on Solaris 8 server.  
-To ensure to be compatible,some new syntax has been replaced with old style syntax, for example:  
+To ensure to be compatible, some new syntax has been replaced with old style syntax, for example:  
 	- let variable++ ===> let variable=variable+1  
 	- ${variable//[0-9]}  ==> echo ${variable} |sed "s/[0-9]//g"   
 	- ${varible:0-1:1} ==> echo ${variable} |sed "s/\(.*\)\(.\)$/\2/"  
@@ -69,14 +69,19 @@ Test environment:
 - From Linux (ubuntu) server to Linux (ubuntu) server    
 - From Solaris 8 server to Solaris 10 server
    
-Bugfix Backlog (To-do):  
+Bugfix/Improvement backlog (To-do):  
 -------------------  
 - rsh hanging has been observed to run rsh to some certain server(although most of Linux/Solaris server are   
-okay). This may be related to the specfic configuration on the targeted server, however, this will cause   
-the tool hanging unexpetedly.  
+okay). This may be related to the specific configuration on the targeted server, however, this will cause   
+the tool hanging unexpectedly.  
 	- Status: Enhanced but no perfect fix yet. To support ConnectTimeout option has been done to ssh,  
 however, for rsh, not all versions supporting timeout option, e.g. FreeBSD support "-t timeout" for rsh,  
 but looks Solaris and ubuntu never support that.   
-- Reporting a message like "Deleting the temporary files before quiting ..." for ctrl+c, otherwise, people  
-may just think ctrl+c is not responding as it could take some time to complete the cleaning-up.  
-
+- Reporting a message like "Deleting the temporary files before quitting ..." for ctrl+c, otherwise, people  
+- So far, it requires double space in the destination side, e.g. to ship a file in 1G bytes, need at least 2G   
+disk space in the remote side. The reason lies in the fact that the temporary file pieces will also need to   
+take space, and the temporary files won't be deleted until the final file generation completes. This part  
+can be improved by merging each piece of file then deleting the related temporary file at once. If following  
+this way, for the previous example (i.e. shipping a file in 1G bytes), with assuming we set split number is  
+10, we may need only about 1.1G disk space in the destination side.   
+   
