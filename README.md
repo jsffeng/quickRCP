@@ -69,7 +69,7 @@ Test environment:
 - From Linux (ubuntu) server to Linux (ubuntu) server    
 - From Solaris 8 server to Solaris 10 server
    
-Bugfix/Improvement backlog (To-do):  
+Bug-fix/Improvement backlog (To-do):  
 -------------------  
 - rsh hanging has been observed to run rsh to some certain server(although most of Linux/Solaris server are   
 okay). This may be related to the specific configuration on the targeted server, however, this will cause   
@@ -83,6 +83,6 @@ may just think ctrl+c is not responding when the tool is doing some cleanup befo
 disk space in the remote side. The reason lies in the fact that the temporary file pieces will also need to   
 take space, and the temporary files won't be deleted until the final file generation completes. This part  
 can be improved by merging each piece of file then deleting the related temporary file at once. If following  
-this way, for the previous example (i.e. shipping a file in 1G bytes), with assuming we set split number is  
+this way, for the previous example (i.e. shipping a file in 1G bytes), with assuming we set split number as  
 10, we may need only about 1.1G disk space in the destination side.   
    
