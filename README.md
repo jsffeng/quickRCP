@@ -85,4 +85,8 @@ take space, and the temporary files won't be deleted until the final file genera
 can be improved by merging each piece of file then deleting the related temporary file at once. If following  
 this way, for the previous example (i.e. shipping a file in 1G bytes), with assuming we set split number as  
 10, we may need only about 1.1G disk space in the destination side.   
-   
+- Could add a new option to allow the user to overwrite single instance mode, which was designed for a server    
+shared by many people and could limit the number of background processes by a single login. With this new feature,  
+one login could run multiple instances at the time as long as the destination directories are different. This    
+feature could be helpful for the server which doesn't have lots of users, or command is executed during the idle    
+time of the server.
