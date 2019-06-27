@@ -48,11 +48,11 @@ unexpected aborting happens.
     
 Development Environment:  
 ----------------------  
-- Initial version developed on Solaris 10 server, with supporting rsh/rcp and basic sun day scenarios,  
+- Initial version developed on Solaris 10 server, with supporting rsh/rcp and basic sunny day scenarios,  
 but the followings were not covered:  
-	- ssh/scp, rainy day handling, Config file and more options, command line interface, etc.  
+	- ssh/scp, rainy day scenarios' handling, Config file and more options, command line interface, etc.  
 - Full version completed and tested on Linux ubuntu 16.04.01, then tested on Solaris 8 server.  
-To ensure to be compatible, some new syntax has been replaced with old style syntax, for example:  
+For the compatiblilities to above platforms, some new syntax has been replaced with old style syntax, for example:  
 	- let variable++ ===> let variable=variable+1  
 	- ${variable//[0-9]}  ==> echo ${variable} |sed "s/[0-9]//g"   
 	- ${varible:0-1:1} ==> echo ${variable} |sed "s/\(.*\)\(.\)$/\2/"  
